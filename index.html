@@ -49,7 +49,7 @@
   header{ display:flex; align-items:flex-end; justify-content:space-between; gap:24px; flex-wrap:wrap; }
   .rec-dot{ width:8px; height:8px; border-radius:50%; background:var(--red); box-shadow:0 0 8px var(--red); animation:pulse 1.6s ease-in-out infinite; }
   @keyframes pulse{ 0%,100%{opacity:1;} 50%{opacity:.35;} }
-  .mode-switch{ display:inline-flex; gap:2px; padding:3px; background:var(--panel-2); border:1px solid var(--border); border-radius:20px; margin-bottom:12px; }
+  .mode-switch{ display:inline-flex; align-self:flex-start; gap:2px; padding:3px; background:var(--panel-2); border:1px solid var(--border); border-radius:20px; }
   .mode-tab{ font-family:var(--font-mono); font-size:11px; letter-spacing:0.1em; text-transform:uppercase; padding:7px 16px; border-radius:16px; border:none; background:transparent; color:var(--text-dim); cursor:pointer; display:flex; align-items:center; gap:7px; transition:background .15s, color .15s; }
   .mode-tab:hover{ color:var(--text); }
   .mode-tab.active{ background:var(--amber); color:#241206; font-weight:600; }
@@ -312,15 +312,16 @@
 
   <header>
     <div>
-      <div class="mode-switch" role="tablist" aria-label="Media set">
-        <button class="mode-tab active" id="tabMain" role="tab" aria-selected="true" type="button"><span class="rec-dot"></span>Main</button>
-        <button class="mode-tab" id="tabParity" role="tab" aria-selected="false" type="button"><span class="rec-dot"></span>Parity</button>
-      </div>
       <h1>RigSpace <span>/ RX capture log</span></h1>
       <div class="subhead">Record and forecast data usage for Streams and PSC media across RX days of a multi-day location shoot, against available storage quotas.</div>
     </div>
     <div class="slate">Created by CMB Media Services Ltd</div>
   </header>
+
+  <div class="mode-switch" role="tablist" aria-label="Media set">
+    <button class="mode-tab active" id="tabMain" role="tab" aria-selected="true" type="button"><span class="rec-dot"></span>Main</button>
+    <button class="mode-tab" id="tabParity" role="tab" aria-selected="false" type="button"><span class="rec-dot"></span>Parity</button>
+  </div>
 
 
   <div id="sampleBanner"></div>
