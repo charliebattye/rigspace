@@ -55,7 +55,11 @@
   .mode-tab.active{ background:var(--amber); color:#241206; font-weight:600; }
   .mode-tab .rec-dot{ width:6px; height:6px; }
   .mode-tab.active .rec-dot{ background:#241206; box-shadow:none; animation:none; }
-  h1{ font-family:var(--font-display); font-weight:600; font-size:30px; margin:0; letter-spacing:-0.01em; }
+  /* line-height:normal, not the body's 1.5 - CodecCalc's body sets no
+     line-height, so its identical h1 rule inherits normal and renders 39px
+     rather than 45px. Without this the title is 6px taller and everything
+     below it sits 6px lower than the calculator. */
+  h1{ font-family:var(--font-display); font-weight:600; font-size:30px; line-height:normal; margin:0; letter-spacing:-0.01em; }
   h1 span{ color:var(--text-dim); font-weight:400; }
   .subhead{ font-size:13px; color:var(--text-dim); margin-top:6px; max-width:520px; line-height:1.5; }
   .slate{ font-family:var(--font-mono); font-size:11px; color:var(--text-faint); text-align:right; line-height:1.7; white-space:nowrap; margin-left:auto; }
