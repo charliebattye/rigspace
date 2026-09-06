@@ -51,8 +51,38 @@
   h1{ font-family:var(--font-display); font-weight:600; font-size:30px; margin:0; letter-spacing:-0.01em; }
   h1 span{ color:var(--text-dim); font-weight:400; }
   .subhead{ font-size:13px; color:var(--text-dim); margin-top:6px; max-width:520px; line-height:1.5; }
-  .slate{ font-family:var(--font-mono); font-size:11px; color:var(--text-faint); text-align:right; line-height:1.7; white-space:nowrap; }
+  .slate{ font-family:var(--font-mono); font-size:11px; color:var(--text-faint); text-align:right; line-height:1.7; white-space:nowrap; margin-left:auto; }
   .slate b{ color:var(--text-dim); font-weight:500; }
+
+  /* The slate strip - the shoot's identity, read across rather than
+     stacked in a corner. The cell for the mode you are on takes the amber
+     rule, so the strip doubles as a reminder of which set you are editing. */
+  .slatebar{
+    display:flex; flex-wrap:wrap;
+    background:var(--panel); border:1px solid var(--border); border-radius:6px;
+    overflow:hidden;
+  }
+  .slatebar .cell{
+    flex:1 1 150px; min-width:0; padding:13px 18px;
+    border-left:1px solid var(--border);
+  }
+  .slatebar .cell:first-child{ border-left:none; }
+  .slatebar .cell.wide{ flex:2 1 240px; }
+  .slatebar .k{
+    font-family:var(--font-mono); font-size:9.5px; letter-spacing:0.13em;
+    text-transform:uppercase; color:var(--text-faint);
+  }
+  .slatebar .v{
+    font-family:var(--font-mono); font-size:15px; font-weight:600; color:var(--text);
+    margin-top:6px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+  }
+  .slatebar .v.dim{ color:var(--text-faint); font-weight:400; }
+  .slatebar .cell.on{ box-shadow:inset 0 2px 0 var(--amber); }
+  .slatebar .cell.on .k{ color:var(--amber); }
+  @media (max-width:560px){
+    .slatebar .cell{ flex:1 1 50%; }
+    .slatebar .cell.wide{ flex:1 1 100%; }
+  }
   .slate .sw{ display:inline-block; width:8px; height:8px; border-radius:2px; margin-right:5px; vertical-align:0; }
 
   /* ---------- panels ---------- */
@@ -108,8 +138,16 @@
   }
   /* the two pools are one thought - they wrap as a unit, not apart */
   .pair{ display:flex; gap:18px; flex:0 0 auto; }
-  .w-name{ width:196px; } .w-num{ width:158px; } .w-sel{ width:174px; } .w-pool{ width:148px; }
-  .controls .spacer{ flex:1 1 auto; }
+  .w-name{ width:176px; } .w-num{ width:152px; } .w-sel{ width:162px; } .w-pool{ width:146px; }
+  .controls .field.actions{ margin-left:auto; }
+  .io-buttons{ display:flex; gap:8px; }
+  .io-buttons button{ height:36px; padding:0 13px; }
+  .savebar{
+    display:flex; align-items:center; gap:8px; margin-top:16px; padding-top:13px;
+    border-top:1px solid var(--border-soft);
+    font-family:var(--font-mono); font-size:10.5px; color:var(--text-faint); letter-spacing:0.02em;
+  }
+  .savebar .dot{ width:7px; height:7px; border-radius:50%; flex:none; background:var(--text-faint); }
   @media (max-width:520px){
     .pair{ flex-wrap:wrap; }
     .w-name, .w-num, .w-sel, .w-pool{ width:100%; }
@@ -258,7 +296,7 @@
   @media (max-width:620px){
     .wrap{ padding:20px 14px 56px; }
     .hero{ font-size:40px; }
-    .slate{ text-align:left; }
+    .slate{ text-align:left; margin-left:0; }
   }
   @media (prefers-reduced-motion:reduce){ *{ transition:none !important; animation:none !important; } }
 </style>
@@ -274,8 +312,9 @@
       <h1>RigSpace <span>/ RX capture log</span></h1>
       <div class="subhead">Record and forecast data usage for Streams and PSC media across RX days of a multi-day location shoot, against available storage quotas.</div>
     </div>
-    <div class="slate" id="slate"></div>
+    <div class="slate">Created by CMB Media Services Ltd</div>
   </header>
+
 
   <div id="sampleBanner"></div>
 
@@ -309,13 +348,19 @@
           <span class="note">TB</span>
         </label>
       </div>
-      <div class="spacer"></div>
-      <div class="field"><span>&nbsp;</span>
-        <button id="exportBtn" class="ghost" type="button">Export CSV</button>
-        <span class="note">&nbsp;</span>
+      <div class="field actions"><span>&nbsp;</span>
+        <div class="io-buttons">
+          <button id="exportBtn" class="ghost" type="button">Export CSV</button>
+          <button id="importBtn" class="ghost" type="button">Import CSV</button>
+        </div>
+        <span class="note" id="ioNote">&nbsp;</span>
       </div>
+      <input type="file" id="importFile" accept=".csv,text/csv" hidden>
     </div>
+    <div class="savebar"><span class="dot" id="saveDot"></span><span id="saveState">Loading&hellip;</span></div>
   </section>
+
+  <section class="slatebar" id="slateBar" aria-label="Production slate"></section>
 
   <section class="panel headline bracket">
     <div class="total">
@@ -436,7 +481,7 @@ RX02	2026-08-12	3.90	1.24
 RX04A	2026-08-14	5.02	1.61"></textarea>
       <div class="paste-actions">
         <button class="primary" id="pasteBtn" type="button">Import rows</button>
-        <span class="hint" id="pasteHint">Tab or comma separated: RX, date, Streams TB, PSC TB. Figures land in the mode you are on. Leave them off to lay in a day you have not shot yet.</span>
+        <span class="hint" id="pasteHint">Tab or comma separated: RX, date, Streams TB, PSC TB &mdash; landing in the mode you are on. Leave the figures off to lay in a day you have not shot yet. A whole exported CSV pasted here restores both modes.</span>
       </div>
     </details>
   </section>
@@ -492,7 +537,8 @@ RX04A	2026-08-14	5.02	1.61"></textarea>
     settings: { project:'', basis:5, main:{ capStreams:null, capPsc:null }, parity:{ capStreams:null, capPsc:null } },
     mode: 'main',
     sample: true,
-    db: null
+    db: null,
+    lastSaved: null
   };
 
   var $ = function(id){ return document.getElementById(id); };
@@ -627,6 +673,7 @@ RX04A	2026-08-14	5.02	1.61"></textarea>
     }catch(e){ return null; }
   }
   function putRow(row){
+    state.lastSaved = new Date();
     saveLocal();
     if(state.db){
       state.db.doc('days/' + row.id).set({
@@ -641,6 +688,7 @@ RX04A	2026-08-14	5.02	1.61"></textarea>
     if(state.db) state.db.doc('days/' + id)['delete']()['catch'](reportDbError);
   }
   function putSettings(){
+    state.lastSaved = new Date();
     saveLocal();
     if(state.db) state.db.doc('meta/settings').set({
       project:state.settings.project, basis:state.settings.basis,
@@ -658,6 +706,101 @@ RX04A	2026-08-14	5.02	1.61"></textarea>
     if(msg) setTimeout(function(){ if(el.textContent === msg) el.textContent = ''; }, 6000);
   }
 
+  function ioNote(msg){
+    var el = $('ioNote');
+    el.innerHTML = '';
+    el.textContent = msg || '\u00a0';
+    if(msg) setTimeout(function(){ if(el.textContent === msg) el.textContent = '\u00a0'; }, 6000);
+  }
+
+  /* Handing a file to the viewer.
+
+     Inside the artifact viewer the sandbox makes an <a download> inert, so
+     the downloads capability is the only route. Outside it there is no
+     capability but the anchor works. Try the capability, fall back to the
+     anchor, and say which happened either way -- the first version did
+     neither visibly, which is why it read as a dead button. */
+  function saveFile(filename, text){
+    ioNote('Preparing\u2026');
+    useCap('downloads').then(function(dl){
+      if(dl){
+        return dl.save({ filename:filename, data:text }).then(function(){
+          ioNote('Saved ' + filename);
+        });
+      }
+      var url = URL.createObjectURL(new Blob([text], { type:'text/csv' }));
+      var a = document.createElement('a');
+      a.href = url; a.download = filename;
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(function(){ URL.revokeObjectURL(url); }, 4000);
+      ioNote('Saved ' + filename);
+    })['catch'](function(e){
+      var code = e && e.code ? e.code : '';
+      ioNote(code === 'declined' ? 'Export cancelled'
+           : code === 'rate_limited' ? 'Try again in a moment'
+           : 'Could not export' + (code ? ' (' + code + ')' : ''));
+    });
+  }
+
+  /* ---------- CSV in ----------
+     Accepts what Export CSV writes -- eight columns, both modes, header row
+     and all -- so a log can go out to a spreadsheet and come back whole.
+     Shorter rows still work and land in the mode you are on. */
+  function importText(text){
+    var lines = String(text || '').split(/\r?\n/).map(function(l){ return l.trim(); }).filter(Boolean);
+    var ok = 0, bad = 0, full = 0;
+
+    lines.forEach(function(l){
+      var parts = l.split(/\t|,|;/).map(function(v){ return v.trim().replace(/^"|"$/g, ''); });
+      while(parts.length && parts[parts.length - 1] === '') parts.pop();
+      if(!parts.length) return;
+      if(/^rx$/i.test(parts[0])) return;                 // header row
+      if(!parseRx(parts[0])){ bad++; return; }
+
+      var isFull = parts.length >= 6 && /^(shot|to shoot)$/i.test(parts[2]);
+      if(isFull){
+        var mainOn = /^shot$/i.test(parts[2]);
+        var parOn = parts.length >= 6 && /^shot$/i.test(parts[5]);
+        var err = upsertFull(parts[0], parts[1],
+          mainOn ? [parts[3], parts[4]] : null,
+          parOn ? [parts[6], parts[7]] : null);
+        if(err){ bad++; } else { ok++; full++; }
+        return;
+      }
+
+      var date = '', a = '', b = '';
+      if(parts.length >= 4){ date = parts[1]; a = parts[2]; b = parts[3]; }
+      else if(parts.length === 3){ a = parts[1]; b = parts[2]; }
+      else if(parts.length === 2){ date = parts[1]; }
+      if(upsert(parts[0], date, a, b, state.mode)) bad++; else ok++;
+    });
+
+    render();
+    return ok + (ok === 1 ? ' row imported' : ' rows imported')
+      + (full ? ' (both modes)' : ' into ' + LABEL[state.mode].toLowerCase())
+      + (bad ? ', ' + bad + ' skipped' : '') + '.';
+  }
+
+  /* Where this log actually lives, said plainly. The shared store only
+     exists inside the artifact viewer; everywhere else it is this browser,
+     and a CSV is the only copy that leaves it. */
+  function renderSaveState(){
+    var dot = $('saveDot'), el = $('saveState');
+    var when = state.lastSaved
+      ? ' \u00b7 last change ' + state.lastSaved.toLocaleTimeString('en-GB', { hour:'2-digit', minute:'2-digit' })
+      : '';
+    if(state.sample){
+      dot.style.background = 'var(--amber)';
+      el.textContent = 'Example data \u2014 nothing is saved until you enter a real RX day';
+    } else if(state.db){
+      dot.style.background = 'var(--green)';
+      el.textContent = 'Saved to the shared log \u2014 everyone who opens this sees these figures' + when;
+    } else {
+      dot.style.background = 'var(--text-faint)';
+      el.textContent = 'Saved in this browser only \u2014 export a CSV to keep a copy off it' + when;
+    }
+  }
+
   /* ---------------- rendering ---------------- */
 
   function render(){
@@ -671,6 +814,7 @@ RX04A	2026-08-14	5.02	1.61"></textarea>
     renderControls(d);
     renderTable(d);
     renderMethod(d);
+    renderSaveState();
     drawDaily(d);
     drawPool($('chartStreams'), d, 'streams');
     drawPool($('chartPsc'), d, 'psc');
@@ -707,28 +851,29 @@ RX04A	2026-08-14	5.02	1.61"></textarea>
   }
 
   function renderSlate(d){
-    var s = $('slate');
-    s.innerHTML = '';
-    function line(parts){
+    var bar = $('slateBar');
+    bar.innerHTML = '';
+
+    function cell(key, value, opts){
+      opts = opts || {};
       var div = document.createElement('div');
-      parts.forEach(function(p){
-        if(p.sw){ var i = document.createElement('i'); i.className = 'sw'; i.style.background = p.sw; div.appendChild(i); }
-        else if(p.b){ var b = document.createElement('b'); b.textContent = p.b; div.appendChild(b); }
-        else div.appendChild(document.createTextNode(p.t));
-      });
-      s.appendChild(div);
+      div.className = 'cell' + (opts.wide ? ' wide' : '') + (opts.on ? ' on' : '');
+      var k = document.createElement('div'); k.className = 'k'; k.textContent = key;
+      var v = document.createElement('div'); v.className = 'v' + (opts.dim ? ' dim' : '');
+      v.textContent = value;
+      div.appendChild(k); div.appendChild(v);
+      bar.appendChild(div);
     }
-    if(state.settings.project) line([{ b:state.settings.project }]);
-    if(d.all.length){
-      line([{ t:'Range ' }, { b:d.all[0].id + '\u2013' + d.all[d.all.length - 1].id }]);
-      MODES.forEach(function(m){
-        var t = modeTotal(m);
-        line([{ t:(m === state.mode ? '\u25b8 ' : '  ') + LABEL[m].toUpperCase() + ' ' },
-              { b:tb(t.total) + ' TB' }, { t:'  ' + t.n + '/' + d.all.length }]);
-      });
-    } else {
-      line([{ b:'No RX days in the log' }]);
-    }
+
+    cell('Production', state.settings.project || 'Untitled production',
+         { wide:true, dim:!state.settings.project });
+    cell('RX range', d.all.length ? d.all[0].id + '\u2013' + d.all[d.all.length - 1].id : 'empty',
+         { dim:!d.all.length });
+    MODES.forEach(function(m){
+      var t = modeTotal(m);
+      cell(LABEL[m], t.n ? tb(t.total) + ' TB' : '\u2014',
+           { on:m === state.mode, dim:!t.n });
+    });
   }
 
   function renderHeadline(d){
@@ -1278,6 +1423,24 @@ RX04A	2026-08-14	5.02	1.61"></textarea>
     return row;
   }
 
+  /* Both modes at once, as a re-imported export gives them. */
+  function upsertFull(rxRaw, date, mainPair, parityPair){
+    var q = parseRx(rxRaw);
+    if(!q) return 'bad RX';
+    if(state.sample){ state.rows = []; state.sample = false; }
+    var row = ensureRow(q);
+    if(date) row.date = date;
+    function fig(pair){
+      if(!pair) return blankFigures();
+      var a = parseFloat(pair[0]), b = parseFloat(pair[1]);
+      return { entered:true, streams:isFinite(a) && a >= 0 ? a : 0, psc:isFinite(b) && b >= 0 ? b : 0 };
+    }
+    row.main = fig(mainPair);
+    row.parity = fig(parityPair);
+    putRow(row);
+    return null;
+  }
+
   /* Figures land in the mode you are on. A blank pair means an RX day
      not yet shot in this mode; one filled figure means it has been, and
      a blank counterpart is a real zero for that day. */
@@ -1358,22 +1521,20 @@ RX04A	2026-08-14	5.02	1.61"></textarea>
   });
 
   $('pasteBtn').addEventListener('click', function(){
-    var lines = $('pasteBox').value.split(/\r?\n/).map(function(l){ return l.trim(); }).filter(Boolean);
-    var ok = 0, bad = 0;
-    lines.forEach(function(l){
-      var parts = l.split(/\t|,|;/).map(function(v){ return v.trim(); });
-      while(parts.length && parts[parts.length - 1] === '') parts.pop();
-      if(!parts.length){ bad++; return; }
-      var rx = parts[0], date = '', s = '', p = '';
-      if(parts.length >= 4){ date = parts[1]; s = parts[2]; p = parts[3]; }
-      else if(parts.length === 3){ s = parts[1]; p = parts[2]; }
-      else if(parts.length === 2){ date = parts[1]; }
-      if(upsert(rx, date, s, p, state.mode)) bad++; else ok++;
-    });
-    render();
+    var msg = importText($('pasteBox').value);
     $('pasteBox').value = '';
-    setHint(ok + (ok === 1 ? ' row imported into ' : ' rows imported into ') + LABEL[state.mode].toLowerCase()
-      + (bad ? ', ' + bad + ' skipped' : '') + '.');
+    setHint(msg);
+  });
+
+  $('importBtn').addEventListener('click', function(){ $('importFile').click(); });
+  $('importFile').addEventListener('change', function(){
+    var file = this.files && this.files[0];
+    if(!file){ return; }
+    var reader = new FileReader();
+    reader.onload = function(){ ioNote(importText(reader.result)); };
+    reader.onerror = function(){ ioNote('Could not read that file'); };
+    reader.readAsText(file);
+    this.value = '';
   });
 
   function bindSetting(id, key, cast){
@@ -1416,13 +1577,8 @@ RX04A	2026-08-14	5.02	1.61"></textarea>
       ].join(','));
     });
     var csv = lines.join('\n');
-    useCap('downloads').then(function(dl){
-      if(!dl){ setHint('Downloads are not available in this view.'); return; }
-      return dl.save({
-        filename:(state.settings.project ? state.settings.project.replace(/[^\w\-]+/g, '-') : 'rx') + '-capture-log.csv',
-        data:csv
-      });
-    })['catch'](function(){ setHint('The download was not saved.'); });
+    var name = (state.settings.project ? state.settings.project.replace(/[^\w\-]+/g, '-') : 'rigspace') + '-capture-log.csv';
+    saveFile(name, csv);
   });
 
   /* ---------------- boot ---------------- */

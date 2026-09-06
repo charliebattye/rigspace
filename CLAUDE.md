@@ -46,6 +46,17 @@ state and lights the shared store up afterwards, never the other way round.
 
 Declared capabilities: `db` (the shared log) and `downloads` (CSV export).
 
+`saveFile()` tries the `downloads` capability first and falls back to an
+`<a download>`. Both halves are needed: inside the viewer the sandbox makes the
+anchor inert, and outside it there is no capability. It reports the outcome next
+to the button — an early version reported into a hint element far down the page,
+which made a working export look like a dead button.
+
+CSV import accepts what export writes — eight columns, both modes, header row —
+so the round trip is lossless. Shorter rows still land in the active mode. Keep
+those two formats in step: `importText()` distinguishes them by looking for
+`shot` / `to shoot` in column three.
+
 ## The data model
 
 One document per RX day, at `days/<RX id>`:
