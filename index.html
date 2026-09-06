@@ -40,7 +40,6 @@
 
   /* ---------- header ---------- */
   header{ display:flex; align-items:flex-end; justify-content:space-between; gap:24px; flex-wrap:wrap; }
-  .eyebrow{ display:flex; align-items:center; gap:8px; font-family:var(--font-mono); font-size:11px; letter-spacing:0.14em; color:var(--text-dim); text-transform:uppercase; margin:0 0 10px; }
   .rec-dot{ width:8px; height:8px; border-radius:50%; background:var(--red); box-shadow:0 0 8px var(--red); animation:pulse 1.6s ease-in-out infinite; }
   @keyframes pulse{ 0%,100%{opacity:1;} 50%{opacity:.35;} }
   .mode-switch{ display:inline-flex; gap:2px; padding:3px; background:var(--panel-2); border:1px solid var(--border); border-radius:20px; margin-bottom:12px; }
@@ -268,7 +267,6 @@
 
   <header>
     <div>
-      <p class="eyebrow"><span class="rec-dot"></span>Capture log &amp; forecast</p>
       <div class="mode-switch" role="tablist" aria-label="Media set">
         <button class="mode-tab active" id="tabMain" role="tab" aria-selected="true" type="button"><span class="rec-dot"></span>Main</button>
         <button class="mode-tab" id="tabParity" role="tab" aria-selected="false" type="button"><span class="rec-dot"></span>Parity</button>
