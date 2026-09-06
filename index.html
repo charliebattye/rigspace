@@ -1,0 +1,1524 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RigSpace</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  /* CodecCalc's own tokens. Single dark theme, deliberately: this is the
+     same instrument as the calculator and shares its viewfinder world. */
+  :root{
+    --bg:#0B0D10;
+    --panel:#14171C;
+    --panel-2:#171B21;
+    --border:#262B33;
+    --border-soft:#1D2129;
+    --text:#E8EAED;
+    --text-dim:#8A919C;
+    --text-faint:#565D68;
+    --amber:#FF764A;
+    --amber-dim:#8A4530;
+    --green:#73FFC5;
+    --green-dim:#1F5C3B;
+    --red:#FF4433;
+    --warn:#FFC24A;
+    /* series identity: Streams takes the amber, PSC the green */
+    --streams:#FF764A;
+    --psc:#73FFC5;
+    --font-display:'Space Grotesk', sans-serif;
+    --font-mono:'JetBrains Mono', monospace;
+    --font-body:'Inter', sans-serif;
+  }
+
+  *{ box-sizing:border-box; }
+  body{
+    margin:0; background:var(--bg); color:var(--text);
+    font-family:var(--font-body); font-size:14px; line-height:1.5;
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap{ max-width:1200px; margin:0 auto; padding:28px 24px 72px; display:flex; flex-direction:column; gap:20px; }
+
+  /* ---------- header ---------- */
+  header{ display:flex; align-items:flex-end; justify-content:space-between; gap:24px; flex-wrap:wrap; }
+  .eyebrow{ display:flex; align-items:center; gap:8px; font-family:var(--font-mono); font-size:11px; letter-spacing:0.14em; color:var(--text-dim); text-transform:uppercase; margin:0 0 10px; }
+  .rec-dot{ width:8px; height:8px; border-radius:50%; background:var(--red); box-shadow:0 0 8px var(--red); animation:pulse 1.6s ease-in-out infinite; }
+  @keyframes pulse{ 0%,100%{opacity:1;} 50%{opacity:.35;} }
+  .mode-switch{ display:inline-flex; gap:2px; padding:3px; background:var(--panel-2); border:1px solid var(--border); border-radius:20px; margin-bottom:12px; }
+  .mode-tab{ font-family:var(--font-mono); font-size:11px; letter-spacing:0.1em; text-transform:uppercase; padding:7px 16px; border-radius:16px; border:none; background:transparent; color:var(--text-dim); cursor:pointer; display:flex; align-items:center; gap:7px; transition:background .15s, color .15s; }
+  .mode-tab:hover{ color:var(--text); }
+  .mode-tab.active{ background:var(--amber); color:#241206; font-weight:600; }
+  .mode-tab .rec-dot{ width:6px; height:6px; }
+  .mode-tab.active .rec-dot{ background:#241206; box-shadow:none; animation:none; }
+  h1{ font-family:var(--font-display); font-weight:600; font-size:30px; margin:0; letter-spacing:-0.01em; }
+  h1 span{ color:var(--text-dim); font-weight:400; }
+  .subhead{ font-size:13px; color:var(--text-dim); margin-top:6px; max-width:520px; line-height:1.5; }
+  .slate{ font-family:var(--font-mono); font-size:11px; color:var(--text-faint); text-align:right; line-height:1.7; white-space:nowrap; }
+  .slate b{ color:var(--text-dim); font-weight:500; }
+  .slate .sw{ display:inline-block; width:8px; height:8px; border-radius:2px; margin-right:5px; vertical-align:0; }
+
+  /* ---------- panels ---------- */
+  .panel{
+    background:var(--panel); border:1px solid var(--border); border-radius:6px; padding:22px;
+    position:relative; min-width:0;
+  }
+  .panel-title{ font-family:var(--font-mono); font-size:11px; letter-spacing:0.12em; text-transform:uppercase; color:var(--amber); margin:0 0 4px; display:flex; align-items:center; gap:8px; }
+  .panel-title::after{ content:''; flex:1; height:1px; background:var(--border); }
+  .panel-note{ font-size:12.5px; color:var(--text-dim); margin:0 0 4px; max-width:64ch; }
+  .panel-head{ display:flex; align-items:flex-start; justify-content:space-between; gap:20px; flex-wrap:wrap; }
+  .panel-head > div:first-child{ flex:1 1 320px; min-width:0; }
+
+  /* corner brackets - viewfinder motif, as the calculator uses */
+  .bracket{ position:relative; }
+  .bracket::before, .bracket::after{
+    content:''; position:absolute; width:14px; height:14px; pointer-events:none;
+  }
+  .bracket::before{ top:-1px; left:-1px; border-top:2px solid var(--amber); border-left:2px solid var(--amber); }
+  .bracket::after{ bottom:-1px; right:-1px; border-bottom:2px solid var(--amber); border-right:2px solid var(--amber); }
+
+  /* ---------- controls ----------
+     Every field is the same three-row grid - caption, control, note - so
+     the captions sit on one line and the inputs on another however the
+     row wraps. Fields with nothing to say in the note row still reserve
+     it, which is what keeps the bottoms level. */
+  .controls{ display:flex; flex-wrap:wrap; align-items:start; gap:16px 18px; }
+  .field{
+    display:grid; grid-template-rows:14px auto 14px; row-gap:6px;
+    align-content:start; min-width:0;
+  }
+  .field > span{
+    font-family:var(--font-mono); font-size:10px; letter-spacing:0.11em;
+    text-transform:uppercase; color:var(--text-faint);
+    line-height:14px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+  }
+  .field input, .field select{
+    font-family:var(--font-mono); font-size:13px; color:var(--text); width:100%;
+    background:var(--panel-2); border:1px solid var(--border); border-radius:4px; padding:8px 10px;
+    height:36px;
+  }
+  .field input[type="text"]{ font-family:var(--font-body); }
+  .field > button{ height:36px; padding:0 14px; }
+  .field input:focus-visible, .field select:focus-visible, button:focus-visible, summary:focus-visible{
+    outline:2px solid var(--amber); outline-offset:2px;
+  }
+  .field .note{
+    font-family:var(--font-mono); font-size:10px; color:var(--text-faint);
+    line-height:14px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+  }
+  .field.scoped > span::after{
+    content:attr(data-mode); margin-left:7px; color:var(--amber); letter-spacing:0.1em;
+  }
+  /* the two pools are one thought - they wrap as a unit, not apart */
+  .pair{ display:flex; gap:18px; flex:0 0 auto; }
+  .w-name{ width:196px; } .w-num{ width:158px; } .w-sel{ width:174px; } .w-pool{ width:148px; }
+  .controls .spacer{ flex:1 1 auto; }
+  @media (max-width:520px){
+    .pair{ flex-wrap:wrap; }
+    .w-name, .w-num, .w-sel, .w-pool{ width:100%; }
+    .pair{ width:100%; }
+    .w-pool{ flex:1 1 120px; width:auto; }
+  }
+
+  button{
+    font-family:var(--font-body); font-size:13px; font-weight:500; color:var(--text);
+    background:var(--panel-2); border:1px solid var(--border); border-radius:4px;
+    padding:8px 14px; cursor:pointer; transition:background .15s, border-color .15s;
+  }
+  button:hover{ background:var(--border-soft); border-color:var(--text-faint); }
+  button.primary{ background:var(--amber); border-color:var(--amber); color:#241206; font-weight:600; }
+  button.primary:hover{ filter:brightness(1.08); background:var(--amber); }
+  button.ghost{ background:transparent; color:var(--text-dim); }
+  button.ghost:hover{ background:var(--panel-2); color:var(--text); }
+
+  /* ---------- headline ---------- */
+  .headline{ display:grid; grid-template-columns:minmax(280px,0.9fr) minmax(320px,1.1fr); gap:0; padding:0; overflow:hidden; }
+  .headline > div{ padding:22px; min-width:0; }
+  .headline .total{ border-right:1px solid var(--border); }
+  .hero-label{ font-family:var(--font-mono); font-size:11px; letter-spacing:0.12em; text-transform:uppercase; color:var(--text-dim); }
+  .hero{
+    font-family:var(--font-mono); font-weight:700; font-size:50px; line-height:1;
+    letter-spacing:-0.02em; color:var(--text); text-shadow:0 0 20px rgba(232,234,237,0.22);
+    margin:10px 0 0;
+  }
+  .hero small{ font-family:var(--font-mono); font-size:17px; font-weight:500; color:var(--text-dim); margin-left:7px; }
+  .hero-sub{ font-family:var(--font-mono); font-size:12px; color:var(--text-dim); margin-top:9px; line-height:1.7; }
+
+  /* pools */
+  .pools{ display:flex; flex-direction:column; gap:18px; }
+  .pool-head{ display:flex; align-items:baseline; justify-content:space-between; gap:12px; }
+  .pool-name{ display:inline-flex; align-items:center; gap:7px; font-family:var(--font-mono); font-size:11px; letter-spacing:0.1em; text-transform:uppercase; color:var(--text); }
+  .pool-name .sw{ width:9px; height:9px; border-radius:2px; flex:none; }
+  .pool-cap{ font-family:var(--font-mono); font-size:11px; color:var(--text-faint); }
+  .pool-fig{ font-family:var(--font-mono); font-size:17px; font-weight:600; margin-top:6px; color:var(--text); }
+  .meter{ position:relative; height:10px; border-radius:2px; margin-top:8px; background:var(--panel-2); border:1px solid var(--border); overflow:hidden; }
+  .meter .fill, .meter .recorded{ position:absolute; top:0; bottom:0; left:0; }
+  .meter .over{ position:absolute; top:0; bottom:0; background:var(--red); }
+  .status{ display:inline-flex; align-items:center; gap:7px; margin-top:9px; font-size:12px; }
+  .status .dot{ width:8px; height:8px; border-radius:50%; flex:none; }
+  .status.good{ color:var(--text-dim); } .status.good .dot{ background:var(--text-faint); }
+  .status.warning{ color:var(--warn); } .status.warning .dot{ background:var(--warn); }
+  .status.critical{ color:var(--red); } .status.critical .dot{ background:var(--red); box-shadow:0 0 8px rgba(255,68,51,0.6); }
+  .status.none{ color:var(--text-faint); } .status.none .dot{ background:var(--text-faint); }
+
+  /* ---------- tiles ---------- */
+  .tiles{ display:grid; grid-template-columns:repeat(4,1fr); gap:12px; }
+  .tile{ background:var(--panel); border:1px solid var(--border); border-radius:6px; padding:16px 18px; }
+  .tile .k{ font-family:var(--font-mono); font-size:10px; letter-spacing:0.11em; text-transform:uppercase; color:var(--text-faint); }
+  .tile .v{ font-family:var(--font-mono); font-size:25px; font-weight:700; letter-spacing:-0.01em; margin-top:7px; color:var(--text); }
+  .tile .v small{ font-family:var(--font-mono); font-size:12px; font-weight:500; color:var(--text-dim); margin-left:4px; }
+  .tile .n{ font-size:11.5px; color:var(--text-faint); margin-top:4px; }
+  .split{ display:flex; height:6px; border-radius:2px; overflow:hidden; margin-top:10px; gap:2px; }
+  .split i{ display:block; height:100%; border-radius:1px; }
+
+  /* ---------- charts ---------- */
+  .legend{ display:flex; gap:16px; flex-wrap:wrap; align-items:center; }
+  .legend span{ display:inline-flex; align-items:center; gap:6px; font-family:var(--font-mono); font-size:10.5px; letter-spacing:0.06em; text-transform:uppercase; color:var(--text-dim); }
+  .legend .sw{ width:10px; height:10px; border-radius:2px; flex:none; }
+  .legend .sw.ghost{ opacity:.34; }
+  .chart{ width:100%; margin-top:14px; }
+  .chart svg{ display:block; width:100%; height:auto; overflow:visible; }
+  .axis-text{ font-family:var(--font-mono); font-size:10px; fill:var(--text-faint); }
+  .band-label{ font-family:var(--font-mono); font-size:9.5px; letter-spacing:0.12em; fill:var(--text-faint); }
+  .dl{ font-family:var(--font-mono); font-size:10.5px; fill:var(--text-dim); font-weight:500; }
+  .charts-2up{ display:grid; grid-template-columns:1fr 1fr; gap:20px; }
+
+  /* tooltip */
+  .tip{
+    position:fixed; z-index:40; pointer-events:none; opacity:0; transition:opacity .09s;
+    background:var(--panel-2); border:1px solid var(--border); border-radius:4px;
+    padding:10px 12px; box-shadow:0 6px 22px rgba(0,0,0,0.55); min-width:158px;
+  }
+  .tip.on{ opacity:1; }
+  .tip .th{ font-family:var(--font-mono); font-size:10.5px; color:var(--amber); letter-spacing:0.08em; text-transform:uppercase; }
+  .tip .tr{ display:flex; align-items:center; gap:8px; margin-top:7px; }
+  .tip .tr .ln{ width:13px; height:0; border-top:3px solid; border-radius:2px; flex:none; }
+  .tip .tr .tv{ font-family:var(--font-mono); font-size:13px; font-weight:600; color:var(--text); }
+  .tip .tr .tn{ font-size:11.5px; color:var(--text-dim); margin-left:auto; }
+  .tip .tt{ border-top:1px solid var(--border); margin-top:8px; padding-top:7px; display:flex; gap:8px; align-items:center; }
+  .tip .tt .tv{ font-family:var(--font-mono); font-size:13px; font-weight:600; color:var(--text); }
+  .tip .tt .tn{ font-size:11.5px; color:var(--text-dim); margin-left:auto; }
+
+  /* ---------- table ---------- */
+  .table-scroll{ overflow-x:auto; margin-top:14px; }
+  table{ width:100%; border-collapse:collapse; font-size:13px; }
+  th, td{ padding:8px 10px; text-align:left; border-bottom:1px solid var(--border-soft); white-space:nowrap; }
+  th{
+    font-family:var(--font-mono); font-size:9.5px; letter-spacing:0.11em; text-transform:uppercase;
+    color:var(--text-faint); font-weight:400; border-bottom:1px solid var(--border);
+  }
+  th.grp{ color:var(--amber); }
+  th.sep, td.sep{ border-left:1px solid var(--border); }
+  td.num, th.num{ text-align:right; font-family:var(--font-mono); font-variant-numeric:tabular-nums; }
+  td.rx{ font-family:var(--font-mono); font-weight:600; letter-spacing:0.02em; }
+  tbody tr:hover{ background:var(--panel-2); }
+  tr.pending td{ color:var(--text-faint); }
+  tr.pending td.rx{ color:var(--text-dim); font-weight:500; }
+  .pill{
+    display:inline-block; font-family:var(--font-mono); font-size:9px; letter-spacing:0.1em;
+    text-transform:uppercase; color:var(--text-faint); border:1px solid var(--border);
+    border-radius:10px; padding:1px 7px;
+  }
+  .rowbtn{ padding:3px 9px; font-size:11.5px; }
+  tfoot td{ border-bottom:none; border-top:1px solid var(--border); font-weight:600; padding-top:11px; font-family:var(--font-mono); font-size:12px; }
+
+  /* ---------- entry ---------- */
+  .entry{ display:flex; flex-wrap:wrap; gap:12px; align-items:flex-end; margin-top:16px; padding-top:16px; border-top:1px solid var(--border-soft); }
+  .entry .field{ width:132px; }
+  .entry .field.rxfield{ width:100px; }
+  .entry > button{ height:36px; margin-bottom:20px; }
+  .hint{ font-size:12px; color:var(--text-dim); }
+  details.paste{ margin-top:14px; }
+  details.paste summary{ cursor:pointer; font-size:12.5px; color:var(--text-dim); }
+  details.paste summary:hover{ color:var(--text); }
+  details.paste textarea{
+    width:100%; margin-top:10px; min-height:96px; resize:vertical;
+    font-family:var(--font-mono); font-size:12px; color:var(--text);
+    background:var(--panel-2); border:1px solid var(--border); border-radius:4px; padding:10px;
+  }
+  .paste-actions{ display:flex; gap:10px; align-items:center; margin-top:10px; flex-wrap:wrap; }
+
+  /* ---------- banner & method ---------- */
+  .banner{
+    display:flex; align-items:flex-start; gap:10px; padding:12px 15px; border-radius:6px;
+    font-size:13px; border:1px solid var(--amber-dim); background:rgba(255,118,74,0.07); color:var(--text-dim);
+  }
+  .banner .dot{ width:8px; height:8px; border-radius:50%; flex:none; margin-top:6px; background:var(--amber); }
+  .banner b{ color:var(--text); font-weight:600; }
+  .method{ font-size:12.5px; color:var(--text-dim); line-height:1.7; }
+  .method p{ margin:0 0 9px; max-width:80ch; }
+  .method p:last-child{ margin-bottom:0; }
+  .method code{ font-family:var(--font-mono); font-size:11.5px; color:var(--amber); }
+  .method b{ color:var(--text); font-weight:600; }
+  .empty{ color:var(--text-faint); font-size:13px; padding:24px 0; text-align:center; }
+
+  @media (max-width:980px){
+    .charts-2up{ grid-template-columns:1fr; }
+    .tiles{ grid-template-columns:repeat(2,1fr); }
+    .headline{ grid-template-columns:1fr; }
+    .headline .total{ border-right:none; border-bottom:1px solid var(--border); }
+  }
+  @media (max-width:620px){
+    .wrap{ padding:20px 14px 56px; }
+    .hero{ font-size:40px; }
+    .slate{ text-align:left; }
+  }
+  @media (prefers-reduced-motion:reduce){ *{ transition:none !important; animation:none !important; } }
+</style>
+
+<div class="wrap">
+
+  <header>
+    <div>
+      <p class="eyebrow"><span class="rec-dot"></span>Capture log &amp; forecast</p>
+      <div class="mode-switch" role="tablist" aria-label="Media set">
+        <button class="mode-tab active" id="tabMain" role="tab" aria-selected="true" type="button"><span class="rec-dot"></span>Main</button>
+        <button class="mode-tab" id="tabParity" role="tab" aria-selected="false" type="button"><span class="rec-dot"></span>Parity</button>
+      </div>
+      <h1>RigSpace <span>/ RX capture log</span></h1>
+      <div class="subhead">Record and forecast data usage for Streams and PSC media across RX days of a multi-day location shoot, against available storage quotas.</div>
+    </div>
+    <div class="slate" id="slate"></div>
+  </header>
+
+  <div id="sampleBanner"></div>
+
+  <section class="panel">
+    <p class="panel-title">Project &amp; storage</p>
+    <div class="controls">
+      <label class="field w-name"><span>Production</span>
+        <input type="text" id="project" placeholder="Production name" autocomplete="off">
+        <span class="note">&nbsp;</span>
+      </label>
+      <label class="field w-num"><span>RX days in project</span>
+        <input type="number" id="rxDays" min="0" max="400" step="1" value="0">
+        <span class="note" id="rxDaysNote">&mdash;</span>
+      </label>
+      <label class="field w-sel"><span>Forecast basis</span>
+        <select id="basis">
+          <option value="3">Last 3 RX days</option>
+          <option value="5" selected>Last 5 RX days</option>
+          <option value="10">Last 10 RX days</option>
+          <option value="0">All RX days</option>
+        </select>
+        <span class="note">&nbsp;</span>
+      </label>
+      <div class="pair">
+        <label class="field scoped w-pool"><span data-mode="MAIN" id="lblCapStreams">Streams pool</span>
+          <input type="number" id="capStreams" min="0" step="1" placeholder="&mdash;">
+          <span class="note">TB</span>
+        </label>
+        <label class="field scoped w-pool"><span data-mode="MAIN" id="lblCapPsc">PSC pool</span>
+          <input type="number" id="capPsc" min="0" step="1" placeholder="&mdash;">
+          <span class="note">TB</span>
+        </label>
+      </div>
+      <div class="spacer"></div>
+      <div class="field"><span>&nbsp;</span>
+        <button id="exportBtn" class="ghost" type="button">Export CSV</button>
+        <span class="note">&nbsp;</span>
+      </div>
+    </div>
+  </section>
+
+  <section class="panel headline bracket">
+    <div class="total">
+      <div class="hero-label">Captured to date &middot; <span id="heroMode">main</span></div>
+      <div class="hero" id="heroTotal">&mdash;<small>TB</small></div>
+      <div class="hero-sub" id="heroSub">No RX days recorded yet</div>
+    </div>
+    <div class="pools">
+      <div class="pool">
+        <div class="pool-head">
+          <span class="pool-name"><i class="sw" style="background:var(--streams)"></i>Streams pool</span>
+          <span class="pool-cap" id="capLabelStreams">not set</span>
+        </div>
+        <div class="pool-fig" id="projStreams">&mdash;</div>
+        <div class="meter" role="img" aria-label="Streams storage used and projected">
+          <div class="fill" id="fillStreams"></div>
+          <div class="recorded" id="recStreams"></div>
+          <div class="over" id="overStreams" style="display:none"></div>
+        </div>
+        <div class="status none" id="statusStreams"><span class="dot"></span><span id="statusStreamsText">Set the Streams pool to track headroom</span></div>
+      </div>
+      <div class="pool">
+        <div class="pool-head">
+          <span class="pool-name"><i class="sw" style="background:var(--psc)"></i>PSC pool</span>
+          <span class="pool-cap" id="capLabelPsc">not set</span>
+        </div>
+        <div class="pool-fig" id="projPsc">&mdash;</div>
+        <div class="meter" role="img" aria-label="PSC storage used and projected">
+          <div class="fill" id="fillPsc"></div>
+          <div class="recorded" id="recPsc"></div>
+          <div class="over" id="overPsc" style="display:none"></div>
+        </div>
+        <div class="status none" id="statusPsc"><span class="dot"></span><span id="statusPscText">Set the PSC pool to track headroom</span></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="tiles">
+    <div class="tile"><div class="k">Mean per RX day</div><div class="v" id="tMeanDay">&mdash;<small>TB</small></div><div class="n" id="tMeanDayN">&mdash;</div></div>
+    <div class="tile"><div class="k">Mean per RX</div><div class="v" id="tMeanRx">&mdash;<small>TB</small></div><div class="n" id="tMeanRxN">&mdash;</div></div>
+    <div class="tile">
+      <div class="k">Streams / PSC split</div>
+      <div class="v" id="tSplit">&mdash;</div>
+      <div class="split" id="tSplitBar"><i style="background:var(--streams); flex:1"></i><i style="background:var(--psc); flex:1"></i></div>
+    </div>
+    <div class="tile"><div class="k">RX days left</div><div class="v" id="tLeft">&mdash;</div><div class="n" id="tLeftN">&mdash;</div></div>
+  </section>
+
+  <section class="panel">
+    <div class="panel-head">
+      <div>
+        <p class="panel-title">Per RX day</p>
+        <p class="panel-note">Each column is one RX day. Split RXs sit side by side under a shared bracket; the days still to shoot carry the forecast.</p>
+      </div>
+      <div class="legend">
+        <span><i class="sw" style="background:var(--streams)"></i>Streams</span>
+        <span><i class="sw" style="background:var(--psc)"></i>PSC</span>
+        <span><i class="sw ghost" style="background:var(--text-dim)"></i>Forecast</span>
+      </div>
+    </div>
+    <div class="chart" id="chartDaily"></div>
+  </section>
+
+  <div class="charts-2up">
+    <section class="panel">
+      <p class="panel-title">Streams against its pool</p>
+      <p class="panel-note">Running total and projection for the Streams storage on its own scale.</p>
+      <div class="chart" id="chartStreams"></div>
+    </section>
+    <section class="panel">
+      <p class="panel-title">PSC against its pool</p>
+      <p class="panel-note">Running total and projection for the PSC storage on its own scale.</p>
+      <div class="chart" id="chartPsc"></div>
+    </section>
+  </div>
+
+  <section class="panel">
+    <div class="panel-head">
+      <div>
+        <p class="panel-title">The log</p>
+        <p class="panel-note">One row per RX day, shared by both modes. Figures are per mode; a day with none against it in this mode is one still to come, and those are what the forecast runs over.</p>
+      </div>
+    </div>
+    <div class="table-scroll">
+      <table id="logTable">
+        <thead>
+          <tr id="logHeadGroups">
+            <th></th><th></th>
+            <th class="num grp sep" colspan="3" id="grpActive">MAIN</th>
+            <th class="num sep" colspan="2" id="grpOther">PARITY</th>
+            <th></th>
+          </tr>
+          <tr>
+            <th>RX</th><th>Date</th>
+            <th class="num sep">Streams TB</th><th class="num">PSC TB</th><th class="num">Cumulative</th>
+            <th class="num sep">Streams TB</th><th class="num">PSC TB</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="logBody"></tbody>
+        <tfoot id="logFoot"></tfoot>
+      </table>
+    </div>
+
+    <div class="entry">
+      <label class="field rxfield"><span>RX</span><input type="text" id="inRx" placeholder="RX01" autocomplete="off"><span class="note">&nbsp;</span></label>
+      <label class="field"><span>Date</span><input type="date" id="inDate"><span class="note">&nbsp;</span></label>
+      <label class="field scoped"><span data-mode="MAIN" id="lblInStreams">Streams</span><input type="number" id="inStreams" min="0" step="0.01" placeholder="0.00"><span class="note">TB</span></label>
+      <label class="field scoped"><span data-mode="MAIN" id="lblInPsc">PSC</span><input type="number" id="inPsc" min="0" step="0.01" placeholder="0.00"><span class="note">TB</span></label>
+      <button class="primary" id="addBtn" type="button">Save RX day</button>
+      <span class="hint" id="entryHint"></span>
+    </div>
+
+    <details class="paste">
+      <summary>Paste a run of days from a spreadsheet</summary>
+      <textarea id="pasteBox" spellcheck="false" placeholder="RX01	2026-08-11	4.12	0.86
+RX02	2026-08-12	3.90	1.24
+RX04A	2026-08-14	5.02	1.61"></textarea>
+      <div class="paste-actions">
+        <button class="primary" id="pasteBtn" type="button">Import rows</button>
+        <span class="hint" id="pasteHint">Tab or comma separated: RX, date, Streams TB, PSC TB. Figures land in the mode you are on. Leave them off to lay in a day you have not shot yet.</span>
+      </div>
+    </details>
+  </section>
+
+  <section class="panel method">
+    <p class="panel-title">How the projection is made</p>
+    <p id="methodText">The forecast takes the mean of the last few recorded RX days and carries it forward over the RX days that have no figures yet, projecting Streams and PSC separately against their own pools.</p>
+    <p><b>Main and Parity share one schedule and nothing else.</b> The RX days, their splits and their dates are one list, so laying in the schedule once covers both. Media sizes and both storage pools are held per mode, because the parity set is its own copy on its own drives &mdash; and the RX days left differ too, since a day can be logged in one mode before the other.</p>
+    <p>The days the forecast runs over come from the log itself, not a number you keep up to date: any line item without figures <em>in this mode</em> is a day still to come. Set <b>RX days in project</b> to lay in the whole schedule at once, then fill each day in as it wraps.</p>
+    <p>The band is one standard deviation of a day&rsquo;s figure, widened over the run as the square root of the days left &mdash; the spread of a total, not one day repeated. It does not forecast below three recorded days, and never runs past the days in the log. Split RXs count as the days they are: <code>RX04A</code> and <code>RX04B</code> are two RX days and one RX, so the per-day and per-RX figures differ, and the projection uses the per-day one.</p>
+    <p>All figures are decimal TB (1 TB = 1000 GB).</p>
+  </section>
+
+</div>
+
+<div class="tip" id="tip" role="status" aria-live="polite"></div>
+
+<script>
+(function(){
+  "use strict";
+
+  var MODES = ['main', 'parity'];
+  var LABEL = { main:'Main', parity:'Parity' };
+
+  /* ---------------------------------------------------------------
+     Sample rows. Eleven RX days shot, nine still to come, with a
+     parity set that runs a little lighter. Shown only while the log is
+     empty, never written to the store, and labelled on the page.
+     --------------------------------------------------------------- */
+  var SAMPLE = [
+    { rx:'RX01',  date:'2026-08-11', main:[4.12, 0.86], parity:[4.12, 0.86] },
+    { rx:'RX02',  date:'2026-08-12', main:[3.90, 1.24], parity:[3.90, 1.24] },
+    { rx:'RX03',  date:'2026-08-13', main:[4.48, 0.71], parity:[4.48, 0.71] },
+    { rx:'RX04A', date:'2026-08-14', main:[5.02, 1.61], parity:[5.02, 1.61] },
+    { rx:'RX04B', date:'2026-08-15', main:[3.36, 1.08], parity:[3.36, 1.08] },
+    { rx:'RX05',  date:'2026-08-18', main:[4.71, 0.94], parity:[4.71, 0.94] },
+    { rx:'RX06',  date:'2026-08-19', main:[5.24, 1.42], parity:[5.24, 1.42] },
+    { rx:'RX07A', date:'2026-08-20', main:[4.05, 1.77], parity:[4.05, 1.77] },
+    { rx:'RX07B', date:'2026-08-21', main:[4.60, 1.19], parity:[4.60, 1.19] },
+    { rx:'RX08',  date:'2026-08-25', main:[5.48, 0.68], parity:[5.48, 0.68] },
+    { rx:'RX09',  date:'2026-08-26', main:[4.93, 1.33], parity:null },
+    { rx:'RX10' }, { rx:'RX11' }, { rx:'RX12' }, { rx:'RX13' }, { rx:'RX14' },
+    { rx:'RX15' }, { rx:'RX16' }, { rx:'RX17' }, { rx:'RX18' }
+  ];
+  var SAMPLE_SETTINGS = {
+    project:'', basis:5,
+    main:   { capStreams:100, capPsc:30 },
+    parity: { capStreams:120, capPsc:40 }
+  };
+
+  var state = {
+    rows: [],
+    settings: { project:'', basis:5, main:{ capStreams:null, capPsc:null }, parity:{ capStreams:null, capPsc:null } },
+    mode: 'main',
+    sample: true,
+    db: null
+  };
+
+  var $ = function(id){ return document.getElementById(id); };
+  var css = function(name){ return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); };
+
+  /* Capabilities only exist inside the artifact viewer. Anywhere else --
+     a saved file, a plain browser -- window.claude is absent entirely. */
+  function useCap(name){
+    try{
+      if(typeof window.claude === 'undefined' || !window.claude || typeof window.claude.use !== 'function'){
+        return Promise.resolve(null);
+      }
+      return window.claude.use(name)['catch'](function(){ return null; });
+    }catch(e){ return Promise.resolve(null); }
+  }
+
+  /* ---------- numbers ---------- */
+  function fmt(v, dp){
+    if(v === null || v === undefined || !isFinite(v)) return '\u2014';
+    return v.toLocaleString('en-GB', { minimumFractionDigits:dp, maximumFractionDigits:dp });
+  }
+  function tb(v){ return fmt(v, 2); }
+
+  /* ---------- RX identity ---------- */
+  function parseRx(raw){
+    var m = String(raw || '').trim().toUpperCase().replace(/\s+/g, '').match(/^RX?[-_]?(\d{1,3})([A-Z]?)$/);
+    if(!m) return null;
+    return { num:parseInt(m[1], 10), part:m[2] || '',
+             id:'RX' + (m[1].length < 2 ? '0' + m[1] : m[1]) + (m[2] || '') };
+  }
+  function sortKey(r){ return r.num * 100 + (r.part ? r.part.charCodeAt(0) - 64 : 0); }
+  function sortedRows(){
+    return state.rows.slice().sort(function(a, b){ return sortKey(a) - sortKey(b); });
+  }
+  function blankFigures(){ return { entered:false, streams:0, psc:0 }; }
+  function figuresOf(row, mode){ return row[mode] || blankFigures(); }
+  function otherMode(){ return state.mode === 'main' ? 'parity' : 'main'; }
+
+  /* ---------- statistics ---------- */
+  function mean(a){ return a.length ? a.reduce(function(s, v){ return s + v; }, 0) / a.length : 0; }
+  function sd(a){
+    if(a.length < 2) return 0;
+    var m = mean(a);
+    return Math.sqrt(a.reduce(function(s, v){ return s + (v - m) * (v - m); }, 0) / (a.length - 1));
+  }
+
+  /* Everything the page draws is derived here, for one mode.
+
+     The schedule IS the log, and it is shared: a row exists for every RX
+     day in the project. What is per-mode is whether that day has figures
+     against it, so the days still to come can differ between Main and
+     Parity. */
+  function derive(mode){
+    var caps = state.settings[mode] || { capStreams:null, capPsc:null };
+    var all = sortedRows();
+    var recorded = [], pending = [];
+    all.forEach(function(r){ (figuresOf(r, mode).entered ? recorded : pending).push(r); });
+
+    var cumS = 0, cumP = 0, cum = 0;
+    var series = recorded.map(function(r){
+      var f = figuresOf(r, mode);
+      cumS += f.streams; cumP += f.psc; cum += f.streams + f.psc;
+      return { row:r, id:r.id, date:r.date, num:r.num, part:r.part,
+               streams:f.streams, psc:f.psc, cumS:cumS, cumP:cumP, cum:cum };
+    });
+
+    var byRx = {};
+    series.forEach(function(p){ byRx[p.num] = (byRx[p.num] || 0) + p.streams + p.psc; });
+    var rxCount = Object.keys(byRx).length;
+
+    var n = series.length, k = pending.length;
+    var win = state.settings.basis > 0 ? series.slice(-state.settings.basis) : series;
+    var can = n >= 3 && k > 0;
+
+    /* One pool's forecast. The band is the spread of the TOTAL over k
+       days -- sd x sqrt(k) -- not one day's spread repeated k times,
+       which would imply every remaining day goes the same way. */
+    function poolOf(total, arr, cap){
+      var m = mean(arr), s = sd(arr), days = [];
+      for(var j = 1; j <= k; j++){
+        var c = total + m * j, spread = s * Math.sqrt(j);
+        days.push({ n:j, id:pending[j - 1].id, cum:c, lo:Math.max(total, c - spread), hi:c + spread });
+      }
+      var over = null;
+      if(cap){
+        if(total > cap) over = { id:'already', already:true };
+        else for(var q = 0; q < days.length; q++){
+          if(days[q].cum > cap){ over = { id:days[q].id, already:false }; break; }
+        }
+      }
+      return {
+        mean:m, sd:s, total:total, cap:cap, days:days, over:over,
+        projected: can ? total + m * k : total,
+        lo: can ? Math.max(total, total + m * k - s * Math.sqrt(k)) : total,
+        hi: can ? total + m * k + s * Math.sqrt(k) : total
+      };
+    }
+
+    return {
+      mode: mode, all: all, series: series, pending: pending,
+      n: n, k: k, total: cum, totalS: cumS, totalP: cumP,
+      rxCount: rxCount,
+      meanDay: n ? cum / n : 0,
+      meanRx: rxCount ? cum / rxCount : 0,
+      window: win.length, can: can,
+      streams: poolOf(cumS, win.map(function(p){ return p.streams; }), caps.capStreams),
+      psc: poolOf(cumP, win.map(function(p){ return p.psc; }), caps.capPsc)
+    };
+  }
+
+  function modeTotal(mode){
+    var t = 0, n = 0;
+    state.rows.forEach(function(r){
+      var f = figuresOf(r, mode);
+      if(f.entered){ t += f.streams + f.psc; n++; }
+    });
+    return { total:t, n:n };
+  }
+
+  /* ---------------- persistence ---------------- */
+  var LOCAL = 'rxlog.v3';
+
+  function saveLocal(){
+    try{
+      localStorage.setItem(LOCAL, JSON.stringify({ rows:state.rows, settings:state.settings, mode:state.mode }));
+    }catch(e){}
+  }
+  function loadLocal(){
+    try{
+      var raw = localStorage.getItem(LOCAL);
+      return raw ? JSON.parse(raw) : null;
+    }catch(e){ return null; }
+  }
+  function putRow(row){
+    saveLocal();
+    if(state.db){
+      state.db.doc('days/' + row.id).set({
+        rx:row.id, num:row.num, part:row.part, date:row.date || '',
+        main: row.main || blankFigures(),
+        parity: row.parity || blankFigures()
+      })['catch'](reportDbError);
+    }
+  }
+  function removeRow(id){
+    saveLocal();
+    if(state.db) state.db.doc('days/' + id)['delete']()['catch'](reportDbError);
+  }
+  function putSettings(){
+    saveLocal();
+    if(state.db) state.db.doc('meta/settings').set({
+      project:state.settings.project, basis:state.settings.basis,
+      main:state.settings.main, parity:state.settings.parity
+    })['catch'](reportDbError);
+  }
+  function reportDbError(e){
+    var code = e && e.code ? e.code : 'unavailable';
+    if(code === 'not_granted' || code === 'capability_disabled' || code === 'revoked') return;
+    setHint('Could not save to the shared log (' + code + '). This browser still has your entry.');
+  }
+  function setHint(msg){
+    var el = $('entryHint');
+    el.textContent = msg || '';
+    if(msg) setTimeout(function(){ if(el.textContent === msg) el.textContent = ''; }, 6000);
+  }
+
+  /* ---------------- rendering ---------------- */
+
+  function render(){
+    var d = derive(state.mode);
+    renderMode();
+    renderBanner();
+    renderSlate(d);
+    renderHeadline(d);
+    renderPools(d);
+    renderTiles(d);
+    renderControls(d);
+    renderTable(d);
+    renderMethod(d);
+    drawDaily(d);
+    drawPool($('chartStreams'), d, 'streams');
+    drawPool($('chartPsc'), d, 'psc');
+  }
+
+  function renderMode(){
+    var m = state.mode, up = m.toUpperCase();
+    $('tabMain').classList.toggle('active', m === 'main');
+    $('tabParity').classList.toggle('active', m === 'parity');
+    $('tabMain').setAttribute('aria-selected', m === 'main' ? 'true' : 'false');
+    $('tabParity').setAttribute('aria-selected', m === 'parity' ? 'true' : 'false');
+    $('heroMode').textContent = m;
+    ['lblCapStreams', 'lblCapPsc', 'lblInStreams', 'lblInPsc'].forEach(function(id){
+      $(id).setAttribute('data-mode', up);
+    });
+    $('grpActive').textContent = up;
+    $('grpOther').textContent = otherMode().toUpperCase();
+  }
+
+  function renderBanner(){
+    var host = $('sampleBanner');
+    host.innerHTML = '';
+    if(!state.sample) return;
+    var b = document.createElement('div');
+    b.className = 'banner';
+    var dot = document.createElement('span'); dot.className = 'dot';
+    var txt = document.createElement('div');
+    var strong = document.createElement('b'); strong.textContent = 'Example data. ';
+    txt.appendChild(strong);
+    txt.appendChild(document.createTextNode(
+      'Eleven RX days shot and nine still to come, all made up, to show the layout working. Parity is one day behind Main on purpose. Add your first real RX below and they disappear.'));
+    b.appendChild(dot); b.appendChild(txt);
+    host.appendChild(b);
+  }
+
+  function renderSlate(d){
+    var s = $('slate');
+    s.innerHTML = '';
+    function line(parts){
+      var div = document.createElement('div');
+      parts.forEach(function(p){
+        if(p.sw){ var i = document.createElement('i'); i.className = 'sw'; i.style.background = p.sw; div.appendChild(i); }
+        else if(p.b){ var b = document.createElement('b'); b.textContent = p.b; div.appendChild(b); }
+        else div.appendChild(document.createTextNode(p.t));
+      });
+      s.appendChild(div);
+    }
+    if(state.settings.project) line([{ b:state.settings.project }]);
+    if(d.all.length){
+      line([{ t:'Range ' }, { b:d.all[0].id + '\u2013' + d.all[d.all.length - 1].id }]);
+      MODES.forEach(function(m){
+        var t = modeTotal(m);
+        line([{ t:(m === state.mode ? '\u25b8 ' : '  ') + LABEL[m].toUpperCase() + ' ' },
+              { b:tb(t.total) + ' TB' }, { t:'  ' + t.n + '/' + d.all.length }]);
+      });
+    } else {
+      line([{ b:'No RX days in the log' }]);
+    }
+  }
+
+  function renderHeadline(d){
+    var h = $('heroTotal');
+    h.innerHTML = '';
+    h.appendChild(document.createTextNode(d.n ? tb(d.total) : '\u2014'));
+    var sm = document.createElement('small'); sm.textContent = 'TB';
+    h.appendChild(sm);
+    $('heroSub').textContent = d.n
+      ? d.n + (d.n === 1 ? ' RX day' : ' RX days') + ' shot across ' + d.rxCount + (d.rxCount === 1 ? ' RX' : ' RXs')
+        + '\n' + tb(d.totalS) + ' TB Streams  \u00b7  ' + tb(d.totalP) + ' TB PSC'
+      : 'No RX days recorded in this mode yet';
+    $('heroSub').style.whiteSpace = 'pre-line';
+  }
+
+  /* One meter per pool. Solid fill is banked; the paler extension is
+     where the projection lands; a red cap means it lands past the pool. */
+  function renderPools(d){
+    [['streams', 'Streams'], ['psc', 'PSC']].forEach(function(pair){
+      var key = pair[0], Key = pair[1] === 'Streams' ? 'Streams' : 'Psc';
+      var p = d[key], cap = p.cap;
+      var color = css(key === 'streams' ? '--streams' : '--psc');
+
+      $('capLabel' + Key).textContent = cap ? 'pool ' + fmt(cap, 0) + ' TB' : 'not set';
+      $('proj' + Key).textContent = d.n
+        ? (d.can ? tb(p.projected) + ' TB projected' : tb(p.total) + ' TB used')
+        : '\u2014';
+
+      var pctUsed = cap ? Math.min(100, (p.total / cap) * 100) : 0;
+      var pctProj = cap ? Math.min(100, (p.projected / cap) * 100) : 0;
+
+      var st = 'none', text = 'Set the ' + pair[1] + ' pool to track headroom';
+      if(cap && d.n){
+        var ratio = p.projected / cap;
+        if(ratio > 1){
+          st = 'critical';
+          text = 'Over by ' + tb(p.projected - cap) + ' TB'
+               + (p.over && !p.over.already ? ' \u2014 full around ' + p.over.id : '');
+        } else if(ratio > 0.85){
+          st = 'warning';
+          text = tb(cap - p.projected) + ' TB spare \u2014 tight at the current run rate';
+        } else {
+          st = 'good';
+          text = tb(cap - p.projected) + ' TB spare at the current run rate';
+        }
+        if(!d.can) text = tb(cap - p.total) + ' TB spare of what is recorded so far';
+      }
+
+      var fill = $('fill' + Key), rec = $('rec' + Key), over = $('over' + Key);
+      fill.style.width = pctProj + '%';
+      fill.style.background = cap ? color : 'transparent';
+      fill.style.opacity = '0.32';
+      rec.style.width = pctUsed + '%';
+      rec.style.background = cap ? color : 'transparent';
+      over.style.display = (st === 'critical') ? 'block' : 'none';
+      over.style.right = '0'; over.style.left = 'auto'; over.style.width = '5px';
+
+      $('status' + Key).className = 'status ' + st;
+      $('status' + Key + 'Text').textContent = text;
+    });
+  }
+
+  function setTile(id, value, unit, note){
+    var el = $(id);
+    el.innerHTML = '';
+    el.appendChild(document.createTextNode(value));
+    if(unit){ var s = document.createElement('small'); s.textContent = unit; el.appendChild(s); }
+    if(note !== undefined && $(id + 'N')) $(id + 'N').textContent = note;
+  }
+
+  function renderTiles(d){
+    setTile('tMeanDay', d.n ? tb(d.meanDay) : '\u2014', 'TB',
+      d.n ? 'over ' + d.n + (d.n === 1 ? ' day' : ' days') : '\u2014');
+    setTile('tMeanRx', d.rxCount ? tb(d.meanRx) : '\u2014', 'TB',
+      d.rxCount ? 'over ' + d.rxCount + (d.rxCount === 1 ? ' RX' : ' RXs') : '\u2014');
+
+    var pctS = d.total ? (d.totalS / d.total) * 100 : 50;
+    setTile('tSplit', d.total ? Math.round(pctS) + ' / ' + Math.round(100 - pctS) : '\u2014', '');
+    var bar = $('tSplitBar');
+    bar.children[0].style.flex = String(Math.max(0.02, pctS));
+    bar.children[1].style.flex = String(Math.max(0.02, 100 - pctS));
+
+    setTile('tLeft', d.all.length ? String(d.k) : '\u2014', '',
+      d.all.length ? d.n + ' shot of ' + d.all.length + ' in ' + LABEL[d.mode].toLowerCase() : 'add RX days to the log');
+  }
+
+  function renderControls(d){
+    if(document.activeElement !== $('rxDays')) $('rxDays').value = String(d.all.length);
+    $('rxDaysNote').textContent = d.all.length
+      ? d.n + ' shot \u00b7 ' + d.k + ' to go'
+      : 'line items in the log';
+    var caps = state.settings[d.mode];
+    $('capStreams').value = caps.capStreams === null ? '' : String(caps.capStreams);
+    $('capPsc').value = caps.capPsc === null ? '' : String(caps.capPsc);
+  }
+
+  function renderMethod(d){
+    var t = $('methodText');
+    if(d.can){
+      t.textContent = 'Right now, in ' + LABEL[d.mode].toLowerCase() + ': over the last ' + d.window
+        + ' recorded RX days, Streams is running at ' + tb(d.streams.mean) + ' TB a day and PSC at '
+        + tb(d.psc.mean) + ' TB a day, carried forward over the ' + d.k
+        + (d.k === 1 ? ' RX day' : ' RX days') + ' still without figures. That projects '
+        + tb(d.streams.projected) + ' TB of Streams (' + tb(d.streams.lo) + '\u2013' + tb(d.streams.hi) + ') and '
+        + tb(d.psc.projected) + ' TB of PSC (' + tb(d.psc.lo) + '\u2013' + tb(d.psc.hi) + ') by the end of the schedule.';
+    } else if(d.n < 3){
+      t.textContent = 'Not forecasting ' + LABEL[d.mode].toLowerCase()
+        + ' yet: it takes three recorded RX days before a mean means anything. '
+        + 'Once there are three, this paragraph shows the run rate for each pool and the band it implies.';
+    } else {
+      t.textContent = 'Every RX day in the log has ' + LABEL[d.mode].toLowerCase()
+        + ' figures against it, so there is nothing left to forecast. '
+        + 'Raise the RX days in the project, above, to lay in the days still to come.';
+    }
+  }
+
+  function renderTable(d){
+    var body = $('logBody'), foot = $('logFoot');
+    body.innerHTML = ''; foot.innerHTML = '';
+    var other = otherMode();
+
+    if(!d.all.length){
+      var tr0 = document.createElement('tr');
+      var td0 = document.createElement('td');
+      td0.colSpan = 8; td0.className = 'empty';
+      td0.textContent = 'No RX days yet. Add the first one below, or set the RX days in the project to lay in the schedule.';
+      tr0.appendChild(td0); body.appendChild(tr0);
+      return;
+    }
+
+    var cum = 0;
+    d.all.forEach(function(r){
+      var f = figuresOf(r, d.mode), g = figuresOf(r, other);
+      if(f.entered) cum += f.streams + f.psc;
+
+      var tr = document.createElement('tr');
+      if(!f.entered) tr.className = 'pending';
+
+      var tdRx = document.createElement('td'); tdRx.className = 'rx'; tdRx.textContent = r.id;
+      tr.appendChild(tdRx);
+
+      var tdDate = document.createElement('td');
+      if(f.entered) tdDate.textContent = r.date || '\u2014';
+      else { var pill = document.createElement('span'); pill.className = 'pill'; pill.textContent = 'to shoot'; tdDate.appendChild(pill); }
+      tr.appendChild(tdDate);
+
+      [[f.entered ? tb(f.streams) : '\u2014', 'num sep'],
+       [f.entered ? tb(f.psc) : '\u2014', 'num'],
+       [f.entered ? tb(cum) : '\u2014', 'num'],
+       [g.entered ? tb(g.streams) : '\u2014', 'num sep'],
+       [g.entered ? tb(g.psc) : '\u2014', 'num']
+      ].forEach(function(c){
+        var td = document.createElement('td'); td.className = c[1]; td.textContent = c[0]; tr.appendChild(td);
+      });
+
+      var actions = document.createElement('td');
+      var edit = document.createElement('button');
+      edit.className = 'ghost rowbtn'; edit.type = 'button';
+      edit.textContent = f.entered ? 'Edit' : 'Enter';
+      edit.addEventListener('click', function(){
+        $('inRx').value = r.id;
+        $('inDate').value = r.date || '';
+        $('inStreams').value = f.entered ? f.streams : '';
+        $('inPsc').value = f.entered ? f.psc : '';
+        $('inStreams').focus();
+        setHint((f.entered ? 'Loaded ' : 'Entering ') + r.id + ' in ' + LABEL[d.mode].toLowerCase() + '.');
+      });
+      var del = document.createElement('button');
+      del.className = 'ghost rowbtn'; del.type = 'button'; del.textContent = 'Delete';
+      del.style.marginLeft = '6px';
+      del.addEventListener('click', function(){
+        if(state.sample){ setHint('That is example data \u2014 add a real RX to clear it.'); return; }
+        state.rows = state.rows.filter(function(x){ return x.id !== r.id; });
+        removeRow(r.id);
+        render();
+        setHint('Deleted ' + r.id + ' from both modes.');
+      });
+      actions.appendChild(edit); actions.appendChild(del);
+      tr.appendChild(actions);
+      body.appendChild(tr);
+    });
+
+    var ot = modeTotal(other);
+    var otS = 0, otP = 0;
+    state.rows.forEach(function(r){ var g = figuresOf(r, other); if(g.entered){ otS += g.streams; otP += g.psc; } });
+
+    var ftr = document.createElement('tr');
+    var f1 = document.createElement('td'); f1.colSpan = 2;
+    f1.textContent = d.n + ' of ' + d.all.length + ' shot';
+    ftr.appendChild(f1);
+    [[tb(d.totalS), 'num sep'], [tb(d.totalP), 'num'], [tb(d.total), 'num'],
+     [tb(otS), 'num sep'], [tb(otP), 'num']].forEach(function(c){
+      var td = document.createElement('td'); td.className = c[1]; td.textContent = c[0]; ftr.appendChild(td);
+    });
+    ftr.appendChild(document.createElement('td'));
+    foot.appendChild(ftr);
+  }
+
+  /* ---------------- charts ---------------- */
+
+  var SVGNS = 'http://www.w3.org/2000/svg';
+  function el(name, attrs){
+    var n = document.createElementNS(SVGNS, name);
+    for(var k in attrs) if(attrs.hasOwnProperty(k)) n.setAttribute(k, attrs[k]);
+    return n;
+  }
+  function niceTicks(max, count){
+    if(max <= 0) return [0, 1];
+    var raw = max / count;
+    var mag = Math.pow(10, Math.floor(Math.log10(raw)));
+    var norm = raw / mag;
+    var step = (norm <= 1 ? 1 : norm <= 2 ? 2 : norm <= 5 ? 5 : 10) * mag;
+    var ticks = [];
+    for(var v = 0; v <= max + step * 0.001; v += step) ticks.push(+v.toFixed(6));
+    if(ticks[ticks.length - 1] < max) ticks.push(+(ticks[ticks.length - 1] + step).toFixed(6));
+    return ticks;
+  }
+  function barPath(x, y, w, h, r){
+    if(h <= 0.5) return '';
+    r = Math.min(r, w / 2, h);
+    return 'M' + x + ',' + (y + h) + ' L' + x + ',' + (y + r)
+         + ' Q' + x + ',' + y + ' ' + (x + r) + ',' + y
+         + ' L' + (x + w - r) + ',' + y
+         + ' Q' + (x + w) + ',' + y + ' ' + (x + w) + ',' + (y + r)
+         + ' L' + (x + w) + ',' + (y + h) + ' Z';
+  }
+
+  var tip = $('tip');
+  function showTip(evt, build){
+    tip.innerHTML = '';
+    build(tip);
+    tip.classList.add('on');
+    var r = tip.getBoundingClientRect();
+    var x = evt.clientX + 14, y = evt.clientY - r.height - 12;
+    if(x + r.width > window.innerWidth - 8) x = evt.clientX - r.width - 14;
+    if(y < 8) y = evt.clientY + 18;
+    tip.style.left = x + 'px';
+    tip.style.top = y + 'px';
+  }
+  function hideTip(){ tip.classList.remove('on'); }
+  function tipRow(host, color, value, name){
+    var row = document.createElement('div'); row.className = 'tr';
+    var ln = document.createElement('i'); ln.className = 'ln'; ln.style.borderTopColor = color;
+    var v = document.createElement('span'); v.className = 'tv'; v.textContent = value;
+    var n = document.createElement('span'); n.className = 'tn'; n.textContent = name;
+    row.appendChild(ln); row.appendChild(v); row.appendChild(n);
+    host.appendChild(row);
+  }
+  function tipTotal(host, value, name){
+    var row = document.createElement('div'); row.className = 'tt';
+    var v = document.createElement('span'); v.className = 'tv'; v.textContent = value;
+    var n = document.createElement('span'); n.className = 'tn'; n.textContent = name;
+    row.appendChild(v); row.appendChild(n);
+    host.appendChild(row);
+  }
+  function emptyChart(host, msg){
+    host.innerHTML = '';
+    var p = document.createElement('div');
+    p.className = 'empty'; p.textContent = msg;
+    host.appendChild(p);
+  }
+
+  /* --- stacked columns per RX day --- */
+  function drawDaily(d){
+    var host = $('chartDaily');
+    if(!d.n){ emptyChart(host, 'Enter figures against an RX day to draw the chart.'); return; }
+    host.innerHTML = '';
+
+    var W = Math.max(320, host.clientWidth || 900), H = 300;
+    var M = { t:26, r:16, b:52, l:52 };
+    var pw = W - M.l - M.r, ph = H - M.t - M.b;
+
+    var items = d.series.map(function(p){
+      return { kind:'a', label:p.id, num:p.num, part:p.part, streams:p.streams, psc:p.psc, date:p.date };
+    });
+    if(d.can){
+      d.pending.forEach(function(r){
+        items.push({ kind:'f', label:r.id, streams:d.streams.mean, psc:d.psc.mean });
+      });
+    }
+
+    var maxV = 0;
+    items.forEach(function(it){ maxV = Math.max(maxV, it.streams + it.psc); });
+    var ticks = niceTicks(maxV, 4);
+    var yMax = ticks[ticks.length - 1];
+    var y = function(v){ return M.t + ph - (v / yMax) * ph; };
+    var band = pw / items.length;
+    var bw = Math.min(24, band * 0.6);
+
+    var svg = el('svg', { viewBox:'0 0 ' + W + ' ' + H, width:W, height:H, role:'img',
+      'aria-label':'Streams and PSC terabytes for each RX day, with the forecast beyond the divider' });
+
+    ticks.forEach(function(t){
+      svg.appendChild(el('line', { x1:M.l, x2:M.l + pw, y1:y(t), y2:y(t),
+        stroke:t === 0 ? css('--border') : css('--border-soft'), 'stroke-width':1 }));
+      var lab = el('text', { x:M.l - 9, y:y(t) + 3.5, 'text-anchor':'end', 'class':'axis-text' });
+      lab.textContent = fmt(t, t < 10 ? 1 : 0);
+      svg.appendChild(lab);
+    });
+    var yTitle = el('text', { x:M.l - 9, y:M.t - 13, 'text-anchor':'end', 'class':'band-label' });
+    yTitle.textContent = 'TB';
+    svg.appendChild(yTitle);
+
+    if(items.length > d.n){
+      var dx = M.l + d.n * band;
+      svg.appendChild(el('line', { x1:dx, x2:dx, y1:M.t - 4, y2:M.t + ph, stroke:css('--border'), 'stroke-width':1 }));
+      var fl = el('text', { x:dx + 6, y:M.t + 6, 'class':'band-label' }); fl.textContent = 'FORECAST';
+      svg.appendChild(fl);
+      var rl = el('text', { x:dx - 6, y:M.t + 6, 'text-anchor':'end', 'class':'band-label' }); rl.textContent = 'SHOT';
+      svg.appendChild(rl);
+    }
+
+    var GAP = 2, stride = Math.max(1, Math.ceil((items.length * 34) / pw));
+
+    items.forEach(function(it, i){
+      var cx = M.l + band * i + band / 2, x = cx - bw / 2;
+      var ghost = it.kind === 'f';
+      var hS = (it.streams / yMax) * ph, hP = (it.psc / yMax) * ph;
+      var pPsc = barPath(x, y(it.streams + it.psc), bw, Math.max(0, hP - GAP), 4);
+      var pStr = barPath(x, y(it.streams), bw, hS, 0);
+
+      if(pStr){
+        var rS = el('path', { d:pStr, fill:css('--streams'), 'fill-opacity':ghost ? 0.3 : 1 });
+        if(ghost){ rS.setAttribute('stroke', css('--streams')); rS.setAttribute('stroke-width', 1); rS.setAttribute('stroke-dasharray', '3 2'); }
+        svg.appendChild(rS);
+      }
+      if(pPsc){
+        var rP = el('path', { d:pPsc, fill:css('--psc'), 'fill-opacity':ghost ? 0.3 : 1 });
+        if(ghost){ rP.setAttribute('stroke', css('--psc')); rP.setAttribute('stroke-width', 1); rP.setAttribute('stroke-dasharray', '3 2'); }
+        svg.appendChild(rP);
+      }
+
+      if(!ghost || (i - d.n) % stride === 0 || i === items.length - 1){
+        var lab = el('text', { x:cx, y:M.t + ph + 16, 'text-anchor':'middle', 'class':'axis-text' });
+        lab.textContent = ghost ? it.label : (it.part ? it.part : it.label);
+        svg.appendChild(lab);
+      }
+
+      var hit = el('rect', { x:M.l + band * i, y:M.t, width:band, height:ph, fill:'transparent' });
+      hit.addEventListener('pointermove', function(e){
+        showTip(e, function(node){
+          var h = document.createElement('div'); h.className = 'th';
+          h.textContent = (ghost ? it.label + ' \u00b7 forecast' : it.label + (it.date ? ' \u00b7 ' + it.date : ''))
+            + ' \u00b7 ' + LABEL[d.mode];
+          node.appendChild(h);
+          tipRow(node, css('--streams'), tb(it.streams) + ' TB', 'Streams');
+          tipRow(node, css('--psc'), tb(it.psc) + ' TB', 'PSC');
+          tipTotal(node, tb(it.streams + it.psc) + ' TB', 'Day total');
+        });
+      });
+      hit.addEventListener('pointerleave', hideTip);
+      svg.appendChild(hit);
+    });
+
+    // brackets: only a split RX needs one, since a whole RX names itself
+    var groups = [];
+    d.series.forEach(function(p, i){
+      var last = groups[groups.length - 1];
+      if(last && last.num === p.num) last.end = i;
+      else groups.push({ num:p.num, start:i, end:i });
+    });
+    groups.forEach(function(g){
+      if(g.end === g.start) return;
+      var x1 = M.l + band * g.start + band * 0.16;
+      var x2 = M.l + band * (g.end + 1) - band * 0.16;
+      var yb = M.t + ph + 25;
+      svg.appendChild(el('path', {
+        d:'M' + x1 + ',' + yb + ' L' + x1 + ',' + (yb + 4) + ' L' + x2 + ',' + (yb + 4) + ' L' + x2 + ',' + yb,
+        fill:'none', stroke:css('--border'), 'stroke-width':1 }));
+      var lab = el('text', { x:(x1 + x2) / 2, y:yb + 16, 'text-anchor':'middle', 'class':'axis-text' });
+      lab.textContent = 'RX' + (g.num < 10 ? '0' + g.num : g.num) + ' split';
+      svg.appendChild(lab);
+    });
+
+    host.appendChild(svg);
+  }
+
+  /* --- one pool per panel, on its own scale ---
+     The pool limit is a neutral hairline, not a red one: CodecCalc's red
+     sits only dE 8 from its amber, so a red rule beside the amber Streams
+     line would be the one pair a reader could not separate. Red is kept
+     for the crossing point, where it means one thing. */
+  function drawPool(host, d, key){
+    var name = key === 'streams' ? 'Streams' : 'PSC';
+    if(!d.n){ emptyChart(host, 'Enter figures against an RX day to draw the chart.'); return; }
+    host.innerHTML = '';
+
+    var p = d[key];
+    var color = css(key === 'streams' ? '--streams' : '--psc');
+    var cap = p.cap;
+
+    var W = Math.max(280, host.clientWidth || 460), H = 262;
+    var M = { t:26, r:80, b:42, l:48 };
+    var pw = W - M.l - M.r, ph = H - M.t - M.b;
+
+    var nPts = d.n + (d.can ? p.days.length : 0);
+    var maxV = p.total;
+    if(d.can) maxV = Math.max(maxV, p.hi);
+    if(cap) maxV = Math.max(maxV, cap);
+    var ticks = niceTicks(maxV, 4);
+    var yMax = ticks[ticks.length - 1];
+    var band = pw / Math.max(1, nPts);
+    var x = function(i){ return M.l + band * i + band / 2; };
+    var y = function(v){ return M.t + ph - (v / yMax) * ph; };
+    var base = M.t + ph;
+
+    var svg = el('svg', { viewBox:'0 0 ' + W + ' ' + H, width:W, height:H, role:'img',
+      'aria-label':'Cumulative ' + name + ' terabytes with its projection and pool limit' });
+
+    ticks.forEach(function(t){
+      svg.appendChild(el('line', { x1:M.l, x2:M.l + pw, y1:y(t), y2:y(t),
+        stroke:t === 0 ? css('--border') : css('--border-soft'), 'stroke-width':1 }));
+      var lab = el('text', { x:M.l - 9, y:y(t) + 3.5, 'text-anchor':'end', 'class':'axis-text' });
+      lab.textContent = fmt(t, 0);
+      svg.appendChild(lab);
+    });
+    var yTitle = el('text', { x:M.l - 9, y:M.t - 13, 'text-anchor':'end', 'class':'band-label' });
+    yTitle.textContent = 'TB';
+    svg.appendChild(yTitle);
+
+    var line = function(pts){ return pts.map(function(q, i){ return (i ? 'L' : 'M') + q[0] + ',' + q[1]; }).join(' '); };
+    var cumKey = key === 'streams' ? 'cumS' : 'cumP';
+    var pts = d.series.map(function(s, i){ return [x(i), y(s[cumKey])]; });
+
+    var capY = null;
+    if(cap && cap > 0 && cap <= yMax){
+      capY = y(cap);
+      svg.appendChild(el('line', { x1:M.l, x2:M.l + pw, y1:capY, y2:capY,
+        stroke:css('--text-faint'), 'stroke-width':1 }));
+      var cLab = el('text', { x:M.l + pw + 6, y:capY - 4, 'class':'dl' });
+      cLab.textContent = fmt(cap, 0) + ' TB';
+      svg.appendChild(cLab);
+      var cCap = el('text', { x:M.l + pw + 6, y:capY + 8, 'class':'band-label' });
+      cCap.textContent = 'POOL';
+      svg.appendChild(cCap);
+    }
+
+    if(pts.length){
+      svg.appendChild(el('path', {
+        d:line(pts) + ' L' + pts[pts.length - 1][0] + ',' + base + ' L' + pts[0][0] + ',' + base + ' Z',
+        fill:color, 'fill-opacity':0.13 }));
+      svg.appendChild(el('path', { d:line(pts), fill:'none', stroke:color, 'stroke-width':2,
+        'stroke-linejoin':'round', 'stroke-linecap':'round' }));
+    }
+
+    if(d.can && p.days.length){
+      var lastX = x(d.n - 1), lastY = y(p.total);
+      var proj = [[lastX, lastY]].concat(p.days.map(function(fd, i){ return [x(d.n + i), y(fd.cum)]; }));
+      var hi = [[lastX, lastY]].concat(p.days.map(function(fd, i){ return [x(d.n + i), y(fd.hi)]; }));
+      var lo = [[lastX, lastY]].concat(p.days.map(function(fd, i){ return [x(d.n + i), y(fd.lo)]; }));
+
+      svg.appendChild(el('path', {
+        d:line(hi) + ' ' + lo.slice().reverse().map(function(q){ return 'L' + q[0] + ',' + q[1]; }).join(' ') + ' Z',
+        fill:color, 'fill-opacity':0.09 }));
+      svg.appendChild(el('path', { d:line(proj), fill:'none', stroke:color, 'stroke-width':2,
+        'stroke-dasharray':'6 4', 'stroke-linecap':'round' }));
+
+      var dx = M.l + d.n * band;
+      svg.appendChild(el('line', { x1:dx, x2:dx, y1:M.t - 4, y2:base, stroke:css('--border'), 'stroke-width':1 }));
+      var fl = el('text', { x:dx + 5, y:M.t + 6, 'class':'band-label' }); fl.textContent = 'FORECAST';
+      svg.appendChild(fl);
+
+      // where the projection crosses the pool - the operational answer
+      if(p.over && !p.over.already && capY !== null){
+        var oi = -1;
+        for(var q = 0; q < p.days.length; q++) if(p.days[q].id === p.over.id){ oi = q; break; }
+        if(oi >= 0){
+          var ox = x(d.n + oi);
+          svg.appendChild(el('line', { x1:ox, x2:ox, y1:capY, y2:base, stroke:css('--red'),
+            'stroke-width':1, 'stroke-dasharray':'2 3' }));
+          svg.appendChild(el('circle', { cx:ox, cy:capY, r:4, fill:css('--red'),
+            stroke:css('--panel'), 'stroke-width':2 }));
+          var oLab = el('text', { x:ox, y:capY - 10, 'text-anchor':'middle', 'class':'dl' });
+          oLab.setAttribute('fill', css('--red'));
+          oLab.textContent = 'FULL ' + p.over.id;
+          svg.appendChild(oLab);
+        }
+      }
+
+      var endX = proj[proj.length - 1][0], endY = proj[proj.length - 1][1];
+      svg.appendChild(el('circle', { cx:endX, cy:endY, r:4.5, fill:color, stroke:css('--panel'), 'stroke-width':2 }));
+      var endLab = el('text', { x:endX + 9, y:endY + 3.5, 'class':'dl' });
+      if(capY !== null && Math.abs(capY - endY) < 22) endLab.setAttribute('y', endY + 20);
+      endLab.textContent = tb(p.projected) + ' TB';
+      svg.appendChild(endLab);
+    } else if(pts.length){
+      var eX = pts[pts.length - 1][0], eY = pts[pts.length - 1][1];
+      svg.appendChild(el('circle', { cx:eX, cy:eY, r:4.5, fill:color, stroke:css('--panel'), 'stroke-width':2 }));
+      var eLab = el('text', { x:eX + 9, y:eY + 3.5, 'class':'dl' });
+      eLab.textContent = tb(p.total) + ' TB';
+      svg.appendChild(eLab);
+    }
+
+    /* Tick every stride, plus the last point -- but only if it has room.
+       Forcing the final label can otherwise land it on its neighbour. */
+    var stride = Math.max(1, Math.ceil((nPts * 46) / pw));
+    var marks = [];
+    for(var i = 0; i < nPts; i += stride) marks.push(i);
+    var lastMark = marks[marks.length - 1];
+    if(lastMark !== nPts - 1 && (nPts - 1 - lastMark) * band >= 44) marks.push(nPts - 1);
+    marks.forEach(function(i){
+      var lab2 = el('text', { x:x(i), y:base + 16, 'text-anchor':'middle', 'class':'axis-text' });
+      lab2.textContent = i < d.n ? d.series[i].id : p.days[i - d.n].id;
+      svg.appendChild(lab2);
+    });
+
+    var cross = el('line', { x1:0, x2:0, y1:M.t, y2:base, stroke:css('--border'), 'stroke-width':1, opacity:0 });
+    svg.appendChild(cross);
+    var overlay = el('rect', { x:M.l, y:M.t, width:pw, height:ph, fill:'transparent' });
+    overlay.addEventListener('pointermove', function(e){
+      var box = svg.getBoundingClientRect();
+      var px = (e.clientX - box.left) * (W / box.width);
+      var i = Math.max(0, Math.min(nPts - 1, Math.round((px - M.l - band / 2) / band)));
+      cross.setAttribute('x1', x(i)); cross.setAttribute('x2', x(i)); cross.setAttribute('opacity', 1);
+      showTip(e, function(node){
+        var h = document.createElement('div'); h.className = 'th';
+        if(i < d.n){
+          var s = d.series[i];
+          h.textContent = s.id + (s.date ? ' \u00b7 ' + s.date : '') + ' \u00b7 ' + LABEL[d.mode];
+          node.appendChild(h);
+          tipRow(node, color, tb(s[cumKey]) + ' TB', name + ' to date');
+          if(cap) tipTotal(node, tb(cap - s[cumKey]) + ' TB', 'Pool spare');
+        } else {
+          var fd = p.days[i - d.n];
+          h.textContent = fd.id + ' \u00b7 forecast \u00b7 ' + LABEL[d.mode];
+          node.appendChild(h);
+          tipRow(node, color, tb(fd.cum) + ' TB', name + ' projected');
+          tipRow(node, css('--text-dim'), tb(fd.lo) + '\u2013' + tb(fd.hi) + ' TB', 'Band');
+          if(cap) tipTotal(node, tb(cap - fd.cum) + ' TB', 'Pool spare');
+        }
+      });
+    });
+    overlay.addEventListener('pointerleave', function(){ cross.setAttribute('opacity', 0); hideTip(); });
+    svg.appendChild(overlay);
+
+    host.appendChild(svg);
+  }
+
+  /* ---------------- input ---------------- */
+
+  function ensureRow(q){
+    var existing = null;
+    state.rows.forEach(function(r){ if(r.id === q.id) existing = r; });
+    if(existing) return existing;
+    var row = { id:q.id, num:q.num, part:q.part, date:'', main:blankFigures(), parity:blankFigures() };
+    state.rows.push(row);
+    return row;
+  }
+
+  /* Figures land in the mode you are on. A blank pair means an RX day
+     not yet shot in this mode; one filled figure means it has been, and
+     a blank counterpart is a real zero for that day. */
+  function upsert(rxRaw, date, sRaw, pRaw, mode){
+    var q = parseRx(rxRaw);
+    if(!q) return 'RX number not recognised \u2014 use RX01, or RX04A for a split.';
+
+    var sBlank = sRaw === '' || sRaw === null || sRaw === undefined;
+    var pBlank = pRaw === '' || pRaw === null || pRaw === undefined;
+    var entered = !(sBlank && pBlank);
+    var s = sBlank ? 0 : parseFloat(sRaw);
+    var p = pBlank ? 0 : parseFloat(pRaw);
+    if(entered && (!isFinite(s) || s < 0 || !isFinite(p) || p < 0)) return 'Both figures must be zero or more.';
+
+    if(state.sample){ state.rows = []; state.sample = false; }
+
+    var row = ensureRow(q);
+    if(date) row.date = date;
+    row[mode] = { entered:entered, streams:s, psc:p };
+    putRow(row);
+    return null;
+  }
+
+  /* The RX-days control tops the log up to a target count, or trims
+     trailing days not yet shot in EITHER mode. It never removes a day
+     that has figures against it anywhere. */
+  function setRxDays(target){
+    var all = sortedRows();
+    if(target === all.length) return null;
+    if(state.sample) state.sample = false;
+
+    if(target > all.length){
+      var maxNum = all.length ? Math.max.apply(null, all.map(function(r){ return r.num; })) : 0;
+      var added = target - all.length;
+      for(var i = 0; i < added; i++){
+        maxNum++;
+        var id = 'RX' + (maxNum < 10 ? '0' + maxNum : maxNum);
+        var row = { id:id, num:maxNum, part:'', date:'', main:blankFigures(), parity:blankFigures() };
+        state.rows.push(row);
+        putRow(row);
+      }
+      return added + (added === 1 ? ' RX day added.' : ' RX days added.');
+    }
+
+    var free = all.filter(function(r){
+      return !figuresOf(r, 'main').entered && !figuresOf(r, 'parity').entered;
+    });
+    var wanted = all.length - target;
+    var removable = Math.min(wanted, free.length);
+    free.slice(free.length - removable).forEach(function(r){
+      state.rows = state.rows.filter(function(x){ return x.id !== r.id; });
+      removeRow(r.id);
+    });
+    if(removable < wanted){
+      return 'Removed ' + removable + ' day' + (removable === 1 ? '' : 's')
+           + '. The rest have figures in one mode or the other \u2014 delete those rows individually.';
+    }
+    return removable + (removable === 1 ? ' RX day removed.' : ' RX days removed.');
+  }
+
+  function setMode(m){
+    if(state.mode === m) return;
+    state.mode = m;
+    saveLocal();
+    render();
+  }
+  $('tabMain').addEventListener('click', function(){ setMode('main'); });
+  $('tabParity').addEventListener('click', function(){ setMode('parity'); });
+
+  $('addBtn').addEventListener('click', function(){
+    var err = upsert($('inRx').value, $('inDate').value, $('inStreams').value, $('inPsc').value, state.mode);
+    if(err){ setHint(err); return; }
+    var id = parseRx($('inRx').value).id;
+    $('inRx').value = ''; $('inStreams').value = ''; $('inPsc').value = '';
+    render();
+    setHint('Saved ' + id + ' in ' + LABEL[state.mode].toLowerCase() + '.');
+    $('inRx').focus();
+  });
+
+  $('pasteBtn').addEventListener('click', function(){
+    var lines = $('pasteBox').value.split(/\r?\n/).map(function(l){ return l.trim(); }).filter(Boolean);
+    var ok = 0, bad = 0;
+    lines.forEach(function(l){
+      var parts = l.split(/\t|,|;/).map(function(v){ return v.trim(); });
+      while(parts.length && parts[parts.length - 1] === '') parts.pop();
+      if(!parts.length){ bad++; return; }
+      var rx = parts[0], date = '', s = '', p = '';
+      if(parts.length >= 4){ date = parts[1]; s = parts[2]; p = parts[3]; }
+      else if(parts.length === 3){ s = parts[1]; p = parts[2]; }
+      else if(parts.length === 2){ date = parts[1]; }
+      if(upsert(rx, date, s, p, state.mode)) bad++; else ok++;
+    });
+    render();
+    $('pasteBox').value = '';
+    setHint(ok + (ok === 1 ? ' row imported into ' : ' rows imported into ') + LABEL[state.mode].toLowerCase()
+      + (bad ? ', ' + bad + ' skipped' : '') + '.');
+  });
+
+  function bindSetting(id, key, cast){
+    $(id).addEventListener('change', function(){
+      state.settings[key] = cast($(id).value);
+      putSettings();
+      render();
+    });
+  }
+  bindSetting('project', 'project', function(v){ return String(v).slice(0, 80); });
+  bindSetting('basis', 'basis', function(v){ return parseInt(v, 10) || 0; });
+
+  function bindCap(id, key){
+    $(id).addEventListener('change', function(){
+      var n = parseFloat($(id).value);
+      state.settings[state.mode][key] = isFinite(n) && n > 0 ? n : null;
+      putSettings();
+      render();
+    });
+  }
+  bindCap('capStreams', 'capStreams');
+  bindCap('capPsc', 'capPsc');
+
+  $('rxDays').addEventListener('change', function(){
+    var target = Math.max(0, Math.min(400, parseInt($('rxDays').value, 10) || 0));
+    var msg = setRxDays(target);
+    render();
+    if(msg) setHint(msg);
+  });
+
+  $('exportBtn').addEventListener('click', function(){
+    var all = sortedRows();
+    var lines = ['RX,Date,Main state,Main Streams TB,Main PSC TB,Parity state,Parity Streams TB,Parity PSC TB'];
+    all.forEach(function(r){
+      var m = figuresOf(r, 'main'), pa = figuresOf(r, 'parity');
+      lines.push([
+        r.id, r.date || '',
+        m.entered ? 'shot' : 'to shoot', m.entered ? m.streams.toFixed(2) : '', m.entered ? m.psc.toFixed(2) : '',
+        pa.entered ? 'shot' : 'to shoot', pa.entered ? pa.streams.toFixed(2) : '', pa.entered ? pa.psc.toFixed(2) : ''
+      ].join(','));
+    });
+    var csv = lines.join('\n');
+    useCap('downloads').then(function(dl){
+      if(!dl){ setHint('Downloads are not available in this view.'); return; }
+      return dl.save({
+        filename:(state.settings.project ? state.settings.project.replace(/[^\w\-]+/g, '-') : 'rx') + '-capture-log.csv',
+        data:csv
+      });
+    })['catch'](function(){ setHint('The download was not saved.'); });
+  });
+
+  /* ---------------- boot ---------------- */
+
+  function applySettingsToInputs(){
+    $('project').value = state.settings.project || '';
+    $('basis').value = String(state.settings.basis);
+  }
+  function normaliseSettings(s){
+    var out = { project:'', basis:5, main:{ capStreams:null, capPsc:null }, parity:{ capStreams:null, capPsc:null } };
+    if(!s) return out;
+    if(typeof s.project === 'string') out.project = s.project;
+    if(typeof s.basis === 'number') out.basis = s.basis;
+    MODES.forEach(function(m){
+      var src = s[m] || {};
+      out[m].capStreams = typeof src.capStreams === 'number' ? src.capStreams : null;
+      out[m].capPsc = typeof src.capPsc === 'number' ? src.capPsc : null;
+    });
+    // an earlier single-mode store kept one pool pair at the top level
+    if(!s.main && typeof s.capStreams === 'number') out.main.capStreams = s.capStreams;
+    if(!s.main && typeof s.capPsc === 'number') out.main.capPsc = s.capPsc;
+    return out;
+  }
+  function normaliseRow(v, id){
+    var q = parseRx(v.rx || id);
+    if(!q) return null;
+    function fig(o){
+      if(!o || typeof o !== 'object') return blankFigures();
+      var e = typeof o.entered === 'boolean' ? o.entered : (typeof o.streams === 'number');
+      return { entered:e, streams:e ? (Number(o.streams) || 0) : 0, psc:e ? (Number(o.psc) || 0) : 0 };
+    }
+    var main = v.main ? fig(v.main)
+      : fig({ entered: typeof v.entered === 'boolean' ? v.entered : (typeof v.streams === 'number'),
+              streams:v.streams, psc:v.psc });   // pre-modes shape
+    return { id:q.id, num:q.num, part:q.part,
+             date:typeof v.date === 'string' ? v.date : '',
+             main:main, parity:fig(v.parity) };
+  }
+  function useSample(){
+    state.rows = SAMPLE.map(function(s){
+      var q = parseRx(s.rx);
+      var mk = function(a){ return a ? { entered:true, streams:a[0], psc:a[1] } : blankFigures(); };
+      return { id:q.id, num:q.num, part:q.part, date:s.date || '', main:mk(s.main), parity:mk(s.parity) };
+    });
+    state.settings = normaliseSettings(SAMPLE_SETTINGS);
+    state.sample = true;
+  }
+
+  var local = loadLocal();
+  if(local && local.rows && local.rows.length){
+    state.rows = local.rows.map(function(r){ return normaliseRow(r, r.id); }).filter(Boolean);
+    state.settings = normaliseSettings(local.settings);
+    if(local.mode === 'parity' || local.mode === 'main') state.mode = local.mode;
+    state.sample = false;
+  } else {
+    useSample();
+  }
+  applySettingsToInputs();
+  render();
+
+  useCap('db').then(function(db){
+    if(!db) return;
+    state.db = db;
+
+    db.doc('meta/settings').onSnapshot(function(snap){
+      if(!snap.exists) return;
+      state.settings = normaliseSettings(snap.data());
+      applySettingsToInputs();
+      render();
+    }, function(){});
+
+    db.collection('days').onSnapshot(function(snap){
+      var rows = [];
+      snap.docs.forEach(function(doc){
+        var r = normaliseRow(doc.data() || {}, doc.id);
+        if(r) rows.push(r);
+      });
+      if(rows.length){
+        state.rows = rows;
+        state.sample = false;
+        saveLocal();
+        render();
+      }
+    }, function(){});
+  })['catch'](function(){});
+
+  function redraw(){
+    var d = derive(state.mode);
+    drawDaily(d);
+    drawPool($('chartStreams'), d, 'streams');
+    drawPool($('chartPsc'), d, 'psc');
+  }
+  var rt;
+  window.addEventListener('resize', function(){ clearTimeout(rt); rt = setTimeout(redraw, 120); });
+})();
+
+</script>
