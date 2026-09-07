@@ -200,6 +200,15 @@
   }
   .hero small{ font-family:var(--font-mono); font-size:17px; font-weight:500; color:var(--text-dim); margin-left:7px; }
   .hero-sub{ font-family:var(--font-mono); font-size:12px; color:var(--text-dim); margin-top:9px; line-height:1.7; }
+  .hero-days{ font-family:var(--font-mono); font-size:12px; color:var(--text-dim); }
+  .hero-split{ display:flex; gap:20px; flex-wrap:wrap; margin-top:9px; }
+  .hero-split .hs{
+    font-family:var(--font-mono); font-size:12px; color:var(--text-dim);
+    display:inline-flex; align-items:baseline; gap:5px;
+  }
+  .hero-split .hs b{ font-size:17px; font-weight:600; letter-spacing:-0.01em; }
+  .hero-split .streams b{ color:var(--streams); }
+  .hero-split .psc b{ color:var(--psc); }
 
   /* pools */
   .pools{ display:flex; flex-direction:column; gap:18px; }
@@ -519,6 +528,7 @@ RX04A	2026-08-14	5.02	1.61"></textarea>
     <p><b>Main and Parity share one schedule and nothing else.</b> The RX days, their splits and their dates are one list, so laying in the schedule once covers both. Media sizes and both storage pools are held per mode, because the parity set is its own copy on its own drives &mdash; and the RX days left differ too, since a day can be logged in one mode before the other.</p>
     <p>The days the forecast runs over come from the log itself, not a number you keep up to date: any line item without figures <em>in this mode</em> is a day still to come. Set <b>RX days in project</b> to lay in the whole schedule at once, then fill each day in as it wraps.</p>
     <p>The band is one standard deviation of a day&rsquo;s figure, widened over the run as the square root of the days left &mdash; the spread of a total, not one day repeated. It does not forecast below three recorded days, and never runs past the days in the log. Split RXs count as the days they are: <code>RX04A</code> and <code>RX04B</code> are two RX days and one RX, so the per-day and per-RX figures differ, and the projection uses the per-day one.</p>
+    <p><b>When a pool reads as tight or over.</b> Each pool is judged on its <em>projected</em> total &mdash; what is banked plus what the run rate says is still to come &mdash; against the figure you entered for it, and the two pools are judged separately in each mode. Under <b>85%</b> of the pool it reports the spare capacity and stays quiet. From <b>85% to 100%</b> it reads <span style="color:var(--warn)">tight</span>, which means the forecast fits but has no useful margin: one heavy day, one added RX, or a run rate that drifts up will take it past. Over <b>100%</b> it reads <span style="color:var(--red)">over</span>, gives the shortfall in TB, and the chart for that pool marks the RX day the projection crosses the line. Those bands describe the forecast, not what is on the drives &mdash; a pool can read tight while less than half full.</p>
     <p>All figures are decimal TB (1 TB = 1000 GB).</p>
   </section>
 
@@ -917,11 +927,34 @@ RX04A	2026-08-14	5.02	1.61"></textarea>
     h.appendChild(document.createTextNode(d.n ? tb(d.total) : '\u2014'));
     var sm = document.createElement('small'); sm.textContent = 'TB';
     h.appendChild(sm);
-    $('heroSub').textContent = d.n
-      ? d.n + (d.n === 1 ? ' RX day' : ' RX days') + ' shot across ' + d.rxCount + (d.rxCount === 1 ? ' RX' : ' RXs')
-        + '\n' + tb(d.totalS) + ' TB Streams  \u00b7  ' + tb(d.totalP) + ' TB PSC'
-      : 'No RX days recorded in this mode yet';
-    $('heroSub').style.whiteSpace = 'pre-line';
+    var sub = $('heroSub');
+    sub.innerHTML = '';
+    if(!d.n){
+      sub.textContent = 'No RX days recorded in this mode yet';
+      return;
+    }
+
+    var days = document.createElement('div');
+    days.className = 'hero-days';
+    days.textContent = d.n + (d.n === 1 ? ' RX day' : ' RX days') + ' shot across '
+      + d.rxCount + (d.rxCount === 1 ? ' RX' : ' RXs');
+    sub.appendChild(days);
+
+    /* The two pool totals wear their series colours here. They clear the
+       contrast floor on this panel comfortably (6.8 and 14.4 to 1) and each
+       is named in words beside the figure, so the colour reinforces the
+       identity rather than carrying it alone. */
+    var split = document.createElement('div');
+    split.className = 'hero-split';
+    [['streams', d.totalS, 'Streams'], ['psc', d.totalP, 'PSC']].forEach(function(pair){
+      var span = document.createElement('span');
+      span.className = 'hs ' + pair[0];
+      var b = document.createElement('b'); b.textContent = tb(pair[1]);
+      span.appendChild(b);
+      span.appendChild(document.createTextNode(' TB ' + pair[2]));
+      split.appendChild(span);
+    });
+    sub.appendChild(split);
   }
 
   /* One meter per pool. Solid fill is banked; the paler extension is
