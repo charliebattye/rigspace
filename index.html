@@ -31,6 +31,11 @@
   }
 
   *{ box-sizing:border-box; }
+  /* Author rules beat the browser's [hidden]{display:none}, so .savebar's
+     display:flex kept the confirm row on screen. Restate it here rather
+     than relying on the artifact wrapper's copy, which a local file and
+     GitHub Pages do not get. */
+  [hidden]{ display:none !important; }
   body{
     margin:0; color:var(--text);
     font-family:var(--font-body); font-size:14px; line-height:1.5;
@@ -159,7 +164,13 @@
     font-family:var(--font-mono); font-size:10.5px; color:var(--text-faint); letter-spacing:0.02em;
   }
   .savebar .dot{ width:7px; height:7px; border-radius:50%; flex:none; background:var(--text-faint); }
+  .savebar > button{ margin-left:auto; flex:none; }
   .savebar.sample{ color:var(--amber); }
+  .savebar.confirm{ color:var(--red); flex-wrap:wrap; }
+  .savebar.confirm .dot{ background:var(--red); box-shadow:0 0 8px rgba(255,68,51,0.6); }
+  .confirm-actions{ display:flex; gap:8px; margin-left:auto; flex-wrap:wrap; }
+  button.danger{ background:var(--red); border-color:var(--red); color:#2A0B07; font-weight:600; }
+  button.danger:hover{ filter:brightness(1.1); background:var(--red); }
   @media (max-width:520px){
     .pair{ flex-wrap:wrap; }
     .w-name, .w-num, .w-sel, .w-pool{ width:100%; }
@@ -362,7 +373,19 @@
       </div>
       <input type="file" id="importFile" accept=".csv,text/csv" hidden>
     </div>
-    <div class="savebar"><span class="dot" id="saveDot"></span><span id="saveState">Loading&hellip;</span></div>
+    <div class="savebar">
+      <span class="dot" id="saveDot"></span><span id="saveState">Loading&hellip;</span>
+      <button class="ghost rowbtn" id="newProdBtn" type="button">New production</button>
+    </div>
+    <div class="savebar confirm" id="resetConfirm" hidden>
+      <span class="dot"></span>
+      <span id="resetAsk"></span>
+      <span class="confirm-actions">
+        <button class="ghost rowbtn" id="resetExport" type="button">Export CSV first</button>
+        <button class="danger rowbtn" id="resetGo" type="button">Clear it</button>
+        <button class="ghost rowbtn" id="resetCancel" type="button">Cancel</button>
+      </span>
+    </div>
   </section>
 
   <section class="slatebar" id="slateBar" aria-label="Production slate"></section>
@@ -753,12 +776,31 @@ RX04A	2026-08-14	5.02	1.61"></textarea>
      Shorter rows still work and land in the mode you are on. */
   function importText(text){
     var lines = String(text || '').split(/\r?\n/).map(function(l){ return l.trim(); }).filter(Boolean);
-    var ok = 0, bad = 0, full = 0;
+    var ok = 0, bad = 0, full = 0, meta = 0;
+
+    /* '#' lines carry the settings. Split on the FIRST comma only, so a
+       production name may contain commas of its own. */
+    function readMeta(line){
+      var body = line.replace(/^#\s*/, '');
+      var i = body.indexOf(',');
+      if(i < 0) return;                       // the title line
+      var key = body.slice(0, i).trim().toLowerCase();
+      var val = body.slice(i + 1).trim().replace(/^"|"$/g, '').replace(/""/g, '"');
+      var num = val === '' ? null : parseFloat(val);
+      var ok2 = num !== null && isFinite(num) && num > 0;
+      if(key === 'production'){ state.settings.project = val.slice(0, 80); meta++; }
+      else if(key === 'basis'){ var b = parseInt(val, 10); if(!isNaN(b)){ state.settings.basis = b; meta++; } }
+      else if(key === 'main.streamspool'){ state.settings.main.capStreams = ok2 ? num : null; meta++; }
+      else if(key === 'main.pscpool'){ state.settings.main.capPsc = ok2 ? num : null; meta++; }
+      else if(key === 'parity.streamspool'){ state.settings.parity.capStreams = ok2 ? num : null; meta++; }
+      else if(key === 'parity.pscpool'){ state.settings.parity.capPsc = ok2 ? num : null; meta++; }
+    }
 
     lines.forEach(function(l){
       var parts = l.split(/\t|,|;/).map(function(v){ return v.trim().replace(/^"|"$/g, ''); });
       while(parts.length && parts[parts.length - 1] === '') parts.pop();
       if(!parts.length) return;
+      if(l.charAt(0) === '#'){ readMeta(l); return; }    // settings preamble
       if(/^rx$/i.test(parts[0])) return;                 // header row
       if(!parseRx(parts[0])){ bad++; return; }
 
@@ -780,9 +822,11 @@ RX04A	2026-08-14	5.02	1.61"></textarea>
       if(upsert(parts[0], date, a, b, state.mode)) bad++; else ok++;
     });
 
+    if(meta){ applySettingsToInputs(); putSettings(); }
     render();
     return ok + (ok === 1 ? ' row imported' : ' rows imported')
       + (full ? ' (both modes)' : ' into ' + LABEL[state.mode].toLowerCase())
+      + (meta ? ', settings restored' : '')
       + (bad ? ', ' + bad + ' skipped' : '') + '.';
   }
 
@@ -804,7 +848,9 @@ RX04A	2026-08-14	5.02	1.61"></textarea>
       el.textContent = 'Saved to the shared log \u2014 everyone who opens this sees these figures' + when;
     } else {
       dot.style.background = 'var(--text-faint)';
-      el.textContent = 'Saved in this browser only \u2014 export a CSV to keep a copy off it' + when;
+      el.textContent = state.rows.length
+        ? 'Saved in this browser only \u2014 export a CSV to keep a copy off it' + when
+        : 'Empty log \u2014 name the production above, then add your first RX day below';
     }
   }
 
@@ -1516,6 +1562,56 @@ RX04A	2026-08-14	5.02	1.61"></textarea>
     setHint(msg);
   });
 
+  /* Starting the next job. Two steps, and the first one names exactly what
+     goes and who loses it -- the shared log is not this browser's to wipe
+     quietly. The export is offered in the same breath because the CSV round
+     trip is lossless, which is what makes a clear-down reversible. */
+  function showResetConfirm(){
+    var n = state.rows.length;
+    var where = state.db ? ' from the shared log \u2014 everyone with the link loses them'
+                         : ' from this browser';
+    $('resetAsk').textContent = state.sample
+      ? 'Clear the example data and start a new production?'
+      : 'Clear ' + n + (n === 1 ? ' RX day' : ' RX days') + ', both modes and all four pool figures'
+        + where + '?';
+    $('resetConfirm').hidden = false;
+    $('resetGo').focus();
+  }
+  function hideResetConfirm(){ $('resetConfirm').hidden = true; }
+
+  function wipeStore(){
+    if(!state.db) return Promise.resolve();
+    return state.db.collection('days').get().then(function(snap){
+      return Promise.all(snap.docs.map(function(doc){
+        return state.db.doc('days/' + doc.id)['delete']();
+      }));
+    }).then(function(){
+      return state.db.doc('meta/settings')['delete']();
+    })['catch'](function(){});
+  }
+
+  $('newProdBtn').addEventListener('click', showResetConfirm);
+  $('resetCancel').addEventListener('click', hideResetConfirm);
+  $('resetExport').addEventListener('click', function(){ $('exportBtn').click(); });
+  $('resetGo').addEventListener('click', function(){
+    wipeStore().then(function(){
+      state.rows = [];
+      state.settings = { project:'', basis:state.settings.basis,
+                         main:{ capStreams:null, capPsc:null },
+                         parity:{ capStreams:null, capPsc:null } };
+      state.mode = 'main';
+      state.sample = false;      // an empty log, not the example rows
+      state.lastSaved = null;
+      try{ localStorage.removeItem(LOCAL); }catch(e){}
+      saveLocal();
+      hideResetConfirm();
+      applySettingsToInputs();
+      render();
+      ioNote('Cleared \u2014 name the production to begin');
+      $('project').focus();
+    });
+  });
+
   $('importBtn').addEventListener('click', function(){ $('importFile').click(); });
   $('importFile').addEventListener('change', function(){
     var file = this.files && this.files[0];
@@ -1555,9 +1651,32 @@ RX04A	2026-08-14	5.02	1.61"></textarea>
     if(msg) setHint(msg);
   });
 
+  /* A backup that restores the days but not the quotas is only half a
+     backup, so the settings ride along as a '#' preamble. Spreadsheets
+     keep those lines as plain text rows, and the importer reads them
+     back. */
+  function csvCell(v){
+    v = v === null || v === undefined ? '' : String(v);
+    return /[",\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v;
+  }
+  function settingsPreamble(){
+    var m = state.settings.main, p = state.settings.parity;
+    var num = function(v){ return v === null || v === undefined ? '' : v; };
+    return [
+      '# RigSpace capture log',
+      '# production,' + csvCell(state.settings.project),
+      '# basis,' + state.settings.basis,
+      '# main.streamsPool,' + num(m.capStreams),
+      '# main.pscPool,' + num(m.capPsc),
+      '# parity.streamsPool,' + num(p.capStreams),
+      '# parity.pscPool,' + num(p.capPsc)
+    ];
+  }
+
   $('exportBtn').addEventListener('click', function(){
     var all = sortedRows();
-    var lines = ['RX,Date,Main state,Main Streams TB,Main PSC TB,Parity state,Parity Streams TB,Parity PSC TB'];
+    var lines = settingsPreamble().concat(
+      ['RX,Date,Main state,Main Streams TB,Main PSC TB,Parity state,Parity Streams TB,Parity PSC TB']);
     all.forEach(function(r){
       var m = figuresOf(r, 'main'), pa = figuresOf(r, 'parity');
       lines.push([
