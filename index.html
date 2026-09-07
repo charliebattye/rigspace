@@ -159,6 +159,7 @@
     font-family:var(--font-mono); font-size:10.5px; color:var(--text-faint); letter-spacing:0.02em;
   }
   .savebar .dot{ width:7px; height:7px; border-radius:50%; flex:none; background:var(--text-faint); }
+  .savebar.sample{ color:var(--amber); }
   @media (max-width:520px){
     .pair{ flex-wrap:wrap; }
     .w-name, .w-num, .w-sel, .w-pool{ width:100%; }
@@ -284,13 +285,7 @@
   }
   .paste-actions{ display:flex; gap:10px; align-items:center; margin-top:10px; flex-wrap:wrap; }
 
-  /* ---------- banner & method ---------- */
-  .banner{
-    display:flex; align-items:flex-start; gap:10px; padding:12px 15px; border-radius:6px;
-    font-size:13px; border:1px solid var(--amber-dim); background:rgba(255,118,74,0.07); color:var(--text-dim);
-  }
-  .banner .dot{ width:8px; height:8px; border-radius:50%; flex:none; margin-top:6px; background:var(--amber); }
-  .banner b{ color:var(--text); font-weight:600; }
+  /* ---------- method ---------- */
   .method{ font-size:12.5px; color:var(--text-dim); line-height:1.7; }
   .method p{ margin:0 0 9px; }
   .method p:last-child{ margin-bottom:0; }
@@ -327,8 +322,6 @@
     <button class="mode-tab" id="tabParity" role="tab" aria-selected="false" type="button"><span class="rec-dot"></span>Parity</button>
   </div>
 
-
-  <div id="sampleBanner"></div>
 
   <section class="panel">
     <p class="panel-title">Project &amp; storage</p>
@@ -798,12 +791,14 @@ RX04A	2026-08-14	5.02	1.61"></textarea>
      and a CSV is the only copy that leaves it. */
   function renderSaveState(){
     var dot = $('saveDot'), el = $('saveState');
+    dot.parentElement.classList.toggle('sample', !!state.sample);
     var when = state.lastSaved
       ? ' \u00b7 last change ' + state.lastSaved.toLocaleTimeString('en-GB', { hour:'2-digit', minute:'2-digit' })
       : '';
     if(state.sample){
       dot.style.background = 'var(--amber)';
-      el.textContent = 'Example data \u2014 nothing is saved until you enter a real RX day';
+      el.textContent = 'Example data \u2014 eleven made-up RX days and nine to come, showing the layout. '
+        + 'Nothing is saved until you enter a real RX day, and these disappear when you do.';
     } else if(state.db){
       dot.style.background = 'var(--green)';
       el.textContent = 'Saved to the shared log \u2014 everyone who opens this sees these figures' + when;
@@ -818,7 +813,6 @@ RX04A	2026-08-14	5.02	1.61"></textarea>
   function render(){
     var d = derive(state.mode);
     renderMode();
-    renderBanner();
     renderSlate(d);
     renderHeadline(d);
     renderPools(d);
@@ -844,22 +838,6 @@ RX04A	2026-08-14	5.02	1.61"></textarea>
     });
     $('grpActive').textContent = up;
     $('grpOther').textContent = otherMode().toUpperCase();
-  }
-
-  function renderBanner(){
-    var host = $('sampleBanner');
-    host.innerHTML = '';
-    if(!state.sample) return;
-    var b = document.createElement('div');
-    b.className = 'banner';
-    var dot = document.createElement('span'); dot.className = 'dot';
-    var txt = document.createElement('div');
-    var strong = document.createElement('b'); strong.textContent = 'Example data. ';
-    txt.appendChild(strong);
-    txt.appendChild(document.createTextNode(
-      'Eleven RX days shot and nine still to come, all made up, to show the layout working. Add your first real RX below and they disappear.'));
-    b.appendChild(dot); b.appendChild(txt);
-    host.appendChild(b);
   }
 
   function renderSlate(d){
