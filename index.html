@@ -986,8 +986,12 @@ RX04A	2026-08-14	5.02	1.61"></textarea>
     setTile('tMeanRx', d.rxCount ? tb(d.meanRx) : '\u2014', 'TB',
       d.rxCount ? 'over ' + d.rxCount + (d.rxCount === 1 ? ' RX' : ' RXs') : '\u2014');
 
+    /* Round once and derive the other half, so the two can never contradict
+       each other. Rounding both independently shows 51 / 50 at an even
+       split, because halves round upward in both directions. */
     var pctS = d.total ? (d.totalS / d.total) * 100 : 50;
-    setTile('tSplit', d.total ? Math.round(pctS) + ' / ' + Math.round(100 - pctS) : '\u2014', '');
+    var shownS = Math.round(pctS);
+    setTile('tSplit', d.total ? shownS + ' / ' + (100 - shownS) : '\u2014', '');
     var bar = $('tSplitBar');
     bar.children[0].style.flex = String(Math.max(0.02, pctS));
     bar.children[1].style.flex = String(Math.max(0.02, 100 - pctS));
