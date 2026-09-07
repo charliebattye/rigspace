@@ -845,8 +845,10 @@ RX04A	2026-08-14	5.02	1.61"></textarea>
   function renderSaveState(){
     var dot = $('saveDot'), el = $('saveState');
     dot.parentElement.classList.toggle('sample', !!state.sample);
+    /* These lines end in a full stop, so the timestamp follows as its own
+       sentence rather than hanging off a separator. */
     var when = state.lastSaved
-      ? ' \u00b7 last change ' + state.lastSaved.toLocaleTimeString('en-GB', { hour:'2-digit', minute:'2-digit' })
+      ? ' Last change ' + state.lastSaved.toLocaleTimeString('en-GB', { hour:'2-digit', minute:'2-digit' }) + '.'
       : '';
     if(state.sample){
       dot.style.background = 'var(--amber)';
@@ -854,11 +856,11 @@ RX04A	2026-08-14	5.02	1.61"></textarea>
         + 'Nothing is saved until you enter a real RX day, and these disappear when you do.';
     } else if(state.db){
       dot.style.background = 'var(--green)';
-      el.textContent = 'Saved to the shared log \u2014 everyone who opens this sees these figures' + when;
+      el.textContent = 'Saved to the shared log, everyone who opens this sees these figures.' + when;
     } else {
       dot.style.background = 'var(--text-faint)';
       el.textContent = state.rows.length
-        ? 'Saved in this browser only \u2014 export a CSV to keep a copy off it' + when
+        ? 'Saved in this browser only, nobody else sees it. Export a CSV to save a backup.' + when
         : 'Empty log \u2014 name the production above, then add your first RX day below';
     }
   }
