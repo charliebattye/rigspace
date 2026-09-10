@@ -168,15 +168,15 @@
   }
   .storage-row .row-label span::after{ content:attr(data-mode); margin-left:7px; color:var(--amber); }
   .storage-row .pair{ gap:14px; }
-  .io-buttons{ display:flex; gap:8px; }
-  .io-buttons button{ height:36px; padding:0 13px; }
+  .bar-actions{ display:flex; align-items:center; gap:8px; margin-left:auto; flex-wrap:wrap; }
+  .io-note{ font-family:var(--font-mono); font-size:10.5px; color:var(--text-dim); }
   .savebar{
     display:flex; align-items:center; gap:8px; margin-top:16px; padding-top:13px;
     border-top:1px solid var(--border-soft);
     font-family:var(--font-mono); font-size:10.5px; color:var(--text-faint); letter-spacing:0.02em;
   }
   .savebar .dot{ width:7px; height:7px; border-radius:50%; flex:none; background:var(--text-faint); }
-  .savebar > button{ margin-left:auto; flex:none; }
+  .savebar > .bar-actions{ flex:none; }
   .savebar.sample{ color:var(--amber); }
   .savebar.confirm{ color:var(--red); flex-wrap:wrap; }
   .savebar.confirm .dot{ background:var(--red); box-shadow:0 0 8px rgba(255,68,51,0.6); }
@@ -417,13 +417,6 @@
         <span class="note">&nbsp;</span>
       </label>
 
-      <div class="field actions"><span>&nbsp;</span>
-        <div class="io-buttons">
-          <button id="exportBtn" class="ghost" type="button">Export CSV</button>
-          <button id="importBtn" class="ghost" type="button">Import CSV</button>
-        </div>
-        <span class="note" id="ioNote">&nbsp;</span>
-      </div>
       <input type="file" id="importFile" accept=".csv,text/csv" hidden>
 
       <div class="storage-row">
@@ -452,7 +445,12 @@
     </div>
     <div class="savebar">
       <span class="dot" id="saveDot"></span><span id="saveState">Loading&hellip;</span>
-      <button class="ghost rowbtn" id="newProdBtn" type="button">New production</button>
+      <span class="bar-actions">
+        <span class="io-note" id="ioNote"></span>
+        <button class="ghost rowbtn" id="exportBtn" type="button">Export CSV</button>
+        <button class="ghost rowbtn" id="importBtn" type="button">Import CSV</button>
+        <button class="ghost rowbtn" id="newProdBtn" type="button">New production</button>
+      </span>
     </div>
     <div class="savebar confirm" id="resetConfirm" hidden>
       <span class="dot"></span>
@@ -844,8 +842,8 @@ RX04A	2026-08-14	5.02	1.61"></textarea>
   function ioNote(msg){
     var el = $('ioNote');
     el.innerHTML = '';
-    el.textContent = msg || '\u00a0';
-    if(msg) setTimeout(function(){ if(el.textContent === msg) el.textContent = '\u00a0'; }, 6000);
+    el.textContent = msg || '';
+    if(msg) setTimeout(function(){ if(el.textContent === msg) el.textContent = ''; }, 6000);
   }
 
   /* Handing a file to the viewer.
