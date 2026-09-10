@@ -378,6 +378,73 @@
     .slate{ text-align:left; margin-left:0; }
   }
   @media (prefers-reduced-motion:reduce){ *{ transition:none !important; animation:none !important; } }
+
+  /* ---------- client report ----------
+     Screen-only by default; the print sheet turns these on. */
+  .print-only{ display:none; }
+
+  /* The tokens are redefined on a class, not inside @media print, because
+     the SVG charts resolve their colours through css() at draw time. Adding
+     .printing and redrawing gives them paper colours; a media block alone
+     would recolour the page and leave the charts as they were. The two
+     series steps are chosen for white: the screen green is 1.25:1 on
+     paper, effectively invisible. */
+  :root.printing{
+    --bg:#ffffff; --panel:#ffffff; --panel-2:#f4f5f6;
+    --border:#c9ccd1; --border-soft:#e4e6e9;
+    --text:#101215; --text-dim:#43464c; --text-faint:#6a6e75;
+    --amber:#B3480F; --green:#0B7C55; --red:#B4261A; --warn:#8A5B00;
+    --streams:#C2451A; --psc:#0B7C55;
+  }
+
+  @media print{
+    @page{ margin:14mm; }
+    html, body{
+      background:#fff !important; background-image:none !important;
+      color:#101215;
+      -webkit-print-color-adjust:exact; print-color-adjust:exact;
+    }
+    .wrap{ max-width:none; padding:0; gap:14px; }
+    .print-only{ display:block; }
+
+    /* what a client does not need */
+    header, .mode-switch, #configPanel, #logPanel, #methodPanel,
+    .chart-modal, .tip, [data-enlarge], .savebar, .bar-actions{
+      display:none !important;
+    }
+
+    .panel, .slatebar, .tile{
+      break-inside:avoid; box-shadow:none;
+      border:1px solid var(--border); background:#fff;
+    }
+    .charts-2up{ gap:14px; }
+    .hero{ text-shadow:none; }
+    .rec-dot{ display:none; }
+
+    .print-head{
+      display:flex; align-items:flex-end; justify-content:space-between;
+      gap:20px; padding-bottom:12px; border-bottom:2px solid var(--text);
+    }
+    .ph-brand{
+      font-family:var(--font-display); font-size:21px; font-weight:600; letter-spacing:-0.01em;
+    }
+    .ph-brand span{ color:var(--text-dim); font-weight:400; }
+    .ph-meta{
+      font-family:var(--font-mono); font-size:10.5px; color:var(--text-dim);
+      text-align:right; line-height:1.7; white-space:pre-line;
+    }
+    .print-warn{
+      border:1.5px solid var(--red); color:var(--red); border-radius:4px;
+      padding:9px 12px; font-family:var(--font-mono); font-size:11px;
+    }
+    .print-warn[hidden]{ display:none !important; }
+    .print-foot{
+      margin-top:6px; padding-top:10px; border-top:1px solid var(--border);
+      display:flex; justify-content:space-between; gap:20px; flex-wrap:wrap;
+      font-family:var(--font-mono); font-size:9.5px; color:var(--text-faint);
+    }
+    .print-foot .pf-credit{ white-space:nowrap; }
+  }
 </style>
 
 <div class="wrap">
@@ -396,7 +463,7 @@
   </div>
 
 
-  <section class="panel">
+  <section class="panel" id="configPanel">
     <p class="panel-title">Project &amp; storage</p>
     <div class="controls">
       <label class="field w-name"><span>Production</span>
@@ -447,6 +514,7 @@
       <span class="dot" id="saveDot"></span><span id="saveState">Loading&hellip;</span>
       <span class="bar-actions">
         <span class="io-note" id="ioNote"></span>
+        <button class="ghost rowbtn" id="reportBtn" type="button">Client report</button>
         <button class="ghost rowbtn" id="exportBtn" type="button">Export CSV</button>
         <button class="ghost rowbtn" id="importBtn" type="button">Import CSV</button>
         <button class="ghost rowbtn" id="newProdBtn" type="button">New production</button>
@@ -462,6 +530,12 @@
       </span>
     </div>
   </section>
+
+  <div class="print-only print-head">
+    <div class="ph-brand">RigSpace <span>/ RX capture log</span></div>
+    <div class="ph-meta" id="printMeta"></div>
+  </div>
+  <div class="print-only print-warn" id="printWarn" hidden></div>
 
   <section class="slatebar" id="slateBar" aria-label="Production slate"></section>
 
@@ -561,7 +635,7 @@
     <div class="chart" id="cmChart"></div>
   </dialog>
 
-  <section class="panel">
+  <section class="panel" id="logPanel">
     <div class="panel-head">
       <div>
         <p class="panel-title">The log</p>
@@ -610,7 +684,7 @@ RX04A	2026-08-14	5.02	1.61"></textarea>
     </details>
   </section>
 
-  <section class="panel method">
+  <section class="panel method" id="methodPanel">
     <p class="panel-title">How the projection is made</p>
     <p id="methodText">The forecast takes the mean of the last few recorded RX days and carries it forward over the RX days that have no figures yet, projecting Streams and PSC separately against their own pools.</p>
     <p><b>Main and Parity share one schedule and nothing else.</b> The RX days, their splits and their dates are one list, so laying in the schedule once covers both. Media sizes and both storage pools are held per mode, because the parity set is its own copy on its own drives &mdash; and the RX days left differ too, since a day can be logged in one mode before the other.</p>
@@ -621,6 +695,11 @@ RX04A	2026-08-14	5.02	1.61"></textarea>
     <p>All figures are decimal TB (1 TB = 1000 GB).</p>
   </section>
 
+</div>
+
+<div class="print-only print-foot">
+  <span id="printMethod"></span>
+  <span class="pf-credit">Created by CMB Media Services Ltd &middot; www.charliebattye.com</span>
 </div>
 
 <div class="tip" id="tip" role="status" aria-live="polite"></div>
@@ -2081,6 +2160,56 @@ RX04A	2026-08-14	5.02	1.61"></textarea>
   });
   modal.addEventListener('click', function(e){
     if(e.target === modal) closeChart();   // clicking the backdrop
+  });
+
+  /* ---------------- client report ----------------
+     A print sheet rather than a generated PDF: every browser's print dialog
+     saves to PDF, the text stays vector and selectable, and it costs no
+     dependency. Adding .printing swaps the tokens to paper colours, and the
+     charts have to be redrawn for those to reach them. */
+  function fillReportMeta(){
+    var d = derive(state.mode);
+    var today = new Date().toLocaleDateString('en-GB', { day:'numeric', month:'long', year:'numeric' });
+    var lines = [
+      (state.settings.project || 'Untitled production') + '  \u00b7  ' + LABEL[d.mode].toUpperCase(),
+      d.all.length ? d.all[0].id + '\u2013' + d.all[d.all.length - 1].id
+        + '  \u00b7  ' + d.n + ' of ' + d.all.length + ' RX days shot' : 'No RX days logged',
+      'Generated ' + today
+    ];
+    $('printMeta').textContent = lines.join('\n');
+
+    /* Example figures must never leave the building looking real. */
+    var warn = $('printWarn');
+    warn.hidden = !state.sample;
+    if(state.sample){
+      warn.textContent = 'EXAMPLE DATA \u2014 these figures are made up to demonstrate the layout '
+        + 'and are not a record of any production.';
+    }
+
+    $('printMethod').textContent = d.can
+      ? 'Projected from the mean of the last ' + d.window + ' recorded RX days, carried over the '
+        + d.k + ' still to shoot. Decimal TB (1 TB = 1000 GB).'
+      : 'Figures recorded to date. Decimal TB (1 TB = 1000 GB).';
+  }
+
+  $('reportBtn').addEventListener('click', function(){
+    fillReportMeta();
+    if(typeof window.print !== 'function'){
+      ioNote('Printing is not available in this view');
+      return;
+    }
+    try{ window.print(); }
+    catch(e){ ioNote('Printing was blocked in this view'); }
+  });
+
+  window.addEventListener('beforeprint', function(){
+    fillReportMeta();
+    document.documentElement.classList.add('printing');
+    redraw();
+  });
+  window.addEventListener('afterprint', function(){
+    document.documentElement.classList.remove('printing');
+    redraw();
   });
 
   function redraw(){
