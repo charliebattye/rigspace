@@ -224,13 +224,14 @@
   .hero-split .psc b{ color:var(--psc); }
   .hero-proj{
     display:flex; align-items:baseline; gap:10px; flex-wrap:wrap;
-    margin-top:12px; padding-top:11px; border-top:1px solid var(--border-soft);
+    padding-bottom:16px; border-bottom:1px solid var(--border-soft);
   }
   .hero-proj .pk{
-    flex:1 0 100%; margin-bottom:5px;
-    font-family:var(--font-mono); font-size:11px; letter-spacing:0.12em;
-    text-transform:uppercase; color:var(--text-dim);
+    flex:1 0 100%; margin-bottom:4px;
+    font-family:var(--font-mono); font-size:11px; letter-spacing:0.1em;
+    text-transform:uppercase; color:var(--text);
   }
+  .pools > .hero-label{ margin-bottom:-4px; }
   .hero-proj .pv{
     flex:1 0 100%; margin-top:2px;
     font-family:var(--font-mono); font-weight:700; font-size:50px; line-height:1;
@@ -261,12 +262,12 @@
   .pool-name .sw{ width:9px; height:9px; border-radius:2px; flex:none; }
   .pool-cap{ font-family:var(--font-mono); font-size:11px; color:var(--text-faint); }
   .pool-fig{ font-family:var(--font-mono); font-size:17px; font-weight:600; margin-top:6px; color:var(--text); }
-  .meter{ position:relative; height:10px; border-radius:2px; margin-top:8px; background:var(--panel-2); border:1px solid var(--border); overflow:hidden; }
+  .meter{ position:relative; height:18px; border-radius:3px; margin-top:9px; background:var(--panel-2); border:1px solid var(--border); overflow:hidden; }
   .meter .fill, .meter .recorded{ position:absolute; top:0; bottom:0; left:0; }
   .meter .over{ position:absolute; top:0; bottom:0; background:var(--red); }
   .meter .quote-mark{
-    position:absolute; top:-2px; bottom:-2px; width:2px; margin-left:-1px;
-    background:var(--text); opacity:0.75;
+    position:absolute; top:-1px; bottom:-1px; width:2px; margin-left:-1px;
+    background:var(--text); opacity:0.8;
   }
   .status{ display:inline-flex; align-items:center; gap:7px; margin-top:9px; font-size:12px; }
   .status .dot{ width:8px; height:8px; border-radius:50%; flex:none; }
@@ -556,6 +557,8 @@
       <div class="hero-sub" id="heroSub">No RX days recorded yet</div>
     </div>
     <div class="pools">
+      <div class="hero-label">Projections &middot; <span id="projMode">main</span></div>
+      <div class="hero-proj" id="heroProj"></div>
       <div class="pool">
         <div class="pool-head">
           <span class="pool-name"><i class="sw" style="background:var(--streams)"></i>Streams pool</span>
@@ -1080,6 +1083,7 @@ RX04A	2026-08-14	5.02	1.61"></textarea>
     $('tabMain').setAttribute('aria-selected', m === 'main' ? 'true' : 'false');
     $('tabParity').setAttribute('aria-selected', m === 'parity' ? 'true' : 'false');
     $('heroMode').textContent = m;
+    $('projMode').textContent = m;
     ['lblStorageMode', 'lblInStreams', 'lblInPsc'].forEach(function(id){
       $(id).setAttribute('data-mode', up);
     });
@@ -1124,6 +1128,7 @@ RX04A	2026-08-14	5.02	1.61"></textarea>
     sub.innerHTML = '';
     if(!d.n){
       sub.textContent = 'No RX days recorded in this mode yet';
+      $('heroProj').innerHTML = '';
       return;
     }
 
@@ -1152,13 +1157,13 @@ RX04A	2026-08-14	5.02	1.61"></textarea>
     /* The projection as one number. The two pool meters each carry their
        own, but nothing showed the combined figure the production actually
        gets billed against. */
-    var proj = document.createElement('div');
-    proj.className = 'hero-proj';
+    var proj = $('heroProj');
+    proj.innerHTML = '';
     var pk = document.createElement('span'); pk.className = 'pk';
     var pv = document.createElement('span'); pv.className = 'pv';
     if(d.can){
       var total = d.streams.projected + d.psc.projected;
-      pk.textContent = 'Projected total \u00b7 ' + d.mode;
+      pk.textContent = 'Combined';
       pv.textContent = tb(total);
       var unit = document.createElement('small'); unit.textContent = 'TB';
       pv.appendChild(unit);
@@ -1180,12 +1185,12 @@ RX04A	2026-08-14	5.02	1.61"></textarea>
         proj.appendChild(vs);
       }
     } else {
-      pk.textContent = 'Projected total \u00b7 ' + d.mode;
+      pk.textContent = 'Combined';
       pv.className = 'pv dim';
       pv.textContent = d.n < 3 ? 'needs 3 recorded days' : 'no RX days left to forecast';
       proj.appendChild(pk); proj.appendChild(pv);
     }
-    sub.appendChild(proj);
+
   }
 
   /* One meter per pool. Solid fill is banked; the paler extension is
