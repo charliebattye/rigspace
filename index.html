@@ -255,6 +255,15 @@
   .hero-proj .pq.ok{ color:var(--text-dim); }
   .hero-proj .pq.bad{ color:var(--red); }
 
+  .spark{ margin-top:18px; padding-top:14px; border-top:1px solid var(--border-soft); }
+  .spark-head{ display:flex; align-items:baseline; justify-content:space-between; gap:10px; }
+  .spark-head .sk{
+    font-family:var(--font-mono); font-size:10px; letter-spacing:0.12em;
+    text-transform:uppercase; color:var(--text-faint);
+  }
+  .spark-head .sv{ font-family:var(--font-mono); font-size:11.5px; color:var(--text-dim); }
+  .spark .chart{ margin-top:8px; }
+
   /* pools */
   .pools{ display:flex; flex-direction:column; gap:18px; }
   .pool-head{ display:flex; align-items:baseline; justify-content:space-between; gap:12px; }
@@ -555,6 +564,13 @@
       <div class="hero-label">Captured to date &middot; <span id="heroMode">main</span></div>
       <div class="hero" id="heroTotal">&mdash;<small>TB</small></div>
       <div class="hero-sub" id="heroSub">No RX days recorded yet</div>
+      <div class="spark" id="spark" hidden>
+        <div class="spark-head">
+          <span class="sk">Daily run rate</span>
+          <span class="sv" id="sparkMean">&mdash;</span>
+        </div>
+        <div class="chart" id="sparkChart"></div>
+      </div>
     </div>
     <div class="pools">
       <div class="hero-label">Projections &middot; <span id="projMode">main</span></div>
@@ -1071,6 +1087,7 @@ RX04A	2026-08-14	5.02	1.61"></textarea>
     renderMethod(d);
     renderSaveState();
     fillReportMeta(d);
+    drawSpark(d);
     drawDaily(d);
     drawPool($('chartStreams'), d, 'streams');
     drawPool($('chartPsc'), d, 'psc');
@@ -1587,6 +1604,68 @@ RX04A	2026-08-14	5.02	1.61"></textarea>
       lab.textContent = 'RX' + (g.num < 10 ? '0' + g.num : g.num) + ' split';
       svg.appendChild(lab);
     });
+
+    host.appendChild(svg);
+  }
+
+  /* --- daily run rate, as a sparkline ---
+     Neither series colour: this is the two pools summed, so an amber or
+     green line would claim it for one of them. Neutral line, bright end
+     dot for the latest day, and a hairline at the mean so a heavy day
+     reads as heavy rather than merely high. */
+  function drawSpark(d){
+    var host = $('sparkChart'), wrap = $('spark');
+    if(d.n < 2){ wrap.hidden = true; host.innerHTML = ''; return; }
+    wrap.hidden = false;
+    host.innerHTML = '';
+    $('sparkMean').textContent = tb(d.meanDay) + ' TB/day mean';
+
+    var W = Math.max(180, host.clientWidth || 300), H = 78;
+    var M = { t:8, r:8, b:8, l:2 };
+    var pw = W - M.l - M.r, ph = H - M.t - M.b;
+
+    var vals = d.series.map(function(p){ return p.streams + p.psc; });
+    var max = Math.max.apply(null, vals) * 1.08 || 1;
+    var x = function(i){ return M.l + (d.n === 1 ? pw / 2 : (i / (d.n - 1)) * pw); };
+    var y = function(v){ return M.t + ph - (v / max) * ph; };
+
+    var svg = el('svg', { viewBox:'0 0 ' + W + ' ' + H, width:W, height:H, role:'img',
+      'aria-label':'Total terabytes captured on each recorded RX day' });
+
+    var pts = vals.map(function(v, i){ return [x(i), y(v)]; });
+    var line = pts.map(function(q, i){ return (i ? 'L' : 'M') + q[0] + ',' + q[1]; }).join(' ');
+    var base = M.t + ph;
+
+    svg.appendChild(el('line', { x1:M.l, x2:M.l + pw, y1:y(d.meanDay), y2:y(d.meanDay),
+      stroke:css('--border'), 'stroke-width':1 }));
+    svg.appendChild(el('path', {
+      d: line + ' L' + pts[pts.length - 1][0] + ',' + base + ' L' + pts[0][0] + ',' + base + ' Z',
+      fill: css('--text-dim'), 'fill-opacity':0.10 }));
+    svg.appendChild(el('path', { d:line, fill:'none', stroke:css('--text-dim'),
+      'stroke-width':2, 'stroke-linejoin':'round', 'stroke-linecap':'round' }));
+
+    var last = pts[pts.length - 1];
+    svg.appendChild(el('circle', { cx:last[0], cy:last[1], r:3.5, fill:css('--text'),
+      stroke:css('--panel'), 'stroke-width':2 }));
+
+    var overlay = el('rect', { x:0, y:0, width:W, height:H, fill:'transparent' });
+    overlay.addEventListener('pointermove', function(e){
+      var box = svg.getBoundingClientRect();
+      var px = (e.clientX - box.left) * (W / box.width);
+      var i = d.n === 1 ? 0 : Math.round(((px - M.l) / pw) * (d.n - 1));
+      i = Math.max(0, Math.min(d.n - 1, i));
+      var p = d.series[i];
+      showTip(e, function(node){
+        var h = document.createElement('div'); h.className = 'th';
+        h.textContent = p.id + (p.date ? ' \u00b7 ' + p.date : '');
+        node.appendChild(h);
+        tipRow(node, css('--streams'), tb(p.streams) + ' TB', 'Streams');
+        tipRow(node, css('--psc'), tb(p.psc) + ' TB', 'PSC');
+        tipTotal(node, tb(p.streams + p.psc) + ' TB', 'Day total');
+      });
+    });
+    overlay.addEventListener('pointerleave', hideTip);
+    svg.appendChild(overlay);
 
     host.appendChild(svg);
   }
@@ -2226,6 +2305,7 @@ RX04A	2026-08-14	5.02	1.61"></textarea>
 
   function redraw(){
     var d = derive(state.mode);
+    drawSpark(d);
     drawDaily(d);
     drawPool($('chartStreams'), d, 'streams');
     drawPool($('chartPsc'), d, 'psc');
