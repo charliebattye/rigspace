@@ -227,8 +227,9 @@
     margin-top:12px; padding-top:11px; border-top:1px solid var(--border-soft);
   }
   .hero-proj .pk{
-    font-family:var(--font-mono); font-size:10px; letter-spacing:0.12em;
-    text-transform:uppercase; color:var(--text-faint);
+    flex:1 0 100%; margin-bottom:5px;
+    font-family:var(--font-mono); font-size:11px; letter-spacing:0.12em;
+    text-transform:uppercase; color:var(--text-dim);
   }
   .hero-proj .pv{ font-family:var(--font-mono); font-size:17px; font-weight:600; color:var(--text); }
   .hero-proj .pv.dim{ font-size:12px; font-weight:400; color:var(--text-faint); }
@@ -1147,7 +1148,7 @@ RX04A	2026-08-14	5.02	1.61"></textarea>
       pv.textContent = tb(total) + ' TB';
       var delta = document.createElement('span'); delta.className = 'pd';
       delta.textContent = '+' + tb(total - d.total) + ' TB over ' + d.k
-        + (d.k === 1 ? ' RX day' : ' RX days');
+        + (d.k === 1 ? ' RX day' : ' RX days') + ' remaining';
       proj.appendChild(pk); proj.appendChild(pv); proj.appendChild(delta);
 
       /* Variance against the quote, which is the figure the production is
